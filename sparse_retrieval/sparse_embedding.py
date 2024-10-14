@@ -17,6 +17,8 @@ from tqdm.auto import tqdm
 
 import logging
 import sys
+import argparse
+import csv
 
 
 logging.basicConfig(
@@ -311,64 +313,133 @@ class SparseRetrieval:
             return doc_scores, doc_indices
         
 
-    def evaluate(self, evaluation_method = 'hit_at_k'):
+    def evaluate(self, evaluation_method: str = 'hit', output_csv: Optional[str] = None, inference_time: Optional[float] = None, total_time: Optional[float] = None):
         logger.info("Loading evaluation dataset from %s", self.eval_data_path)
-        org_dataset = load_from_disk(self.eval_data_path)
-        eval_df = concatenate_datasets(
-            [
-                org_dataset["train"].flatten_indices(),
-                org_dataset["validation"].flatten_indices(),
-            ]
-        )
-        logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
+        if os.path.isdir(self.eval_data_path):
+            org_dataset = load_from_disk(self.eval_data_path)
+            eval_df = concatenate_datasets(
+                [
+                    org_dataset["train"].flatten_indices(),
+                    org_dataset["validation"].flatten_indices(),
+                ]
+            )
+            logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
+        else:
+            logger.error("Evaluation data path %s does not exist or is not a directory.", self.eval_data_path)
+            raise FileNotFoundError(f"Evaluation data path {self.eval_data_path} not found.")
 
         result_list = self.retrieve(eval_df, topk=self.topk)
-        if evaluation_method == 'hit_at_k':  # k개의 추천 중 선호 아이템이 있는지 측정
-            hit = []
+        if evaluation_method == 'hit':  # k개의 추천 중 선호 아이템이 있는지 측정
+            logger.info("Evaluating Hit@k.")
+            hits = 0
             for example in result_list:
-                hit.append(example['original_context'] in example['context'])
-            score = sum(hit)/len(hit)
-            logger.info(f"retrieval result (Hit@K): {score:.4f}")
-            return result_list, score
+                if 'original_context' in example and example['original_context'] in example.get('context', []):
+                    hits += 1
+            hit_at_k = hits / len(result_list) if len(result_list) > 0 else 0.0
+            logger.info(f"Hit@{self.topk}: {hit_at_k:.4f}")
+            return hit_at_k
+        elif evaluation_method == 'mrr':
+            logger.info("Evaluating MRR@k.")
+            mrr_total = 0.0
+            for example in result_list:
+                if 'original_context' in example:
+                    try:
+                        rank = example['context'].index(example['original_context']) + 1
+                        if rank <= self.topk:
+                            mrr_total += 1.0 / rank
+                    except ValueError:
+                        pass  # original_context not in retrieved contexts
+            mrr_at_k = mrr_total / len(result_list) if len(result_list) > 0 else 0.0
+            logger.info(f"MRR@{self.topk}: {mrr_at_k:.4f}")
+            return mrr_at_k
         else:
             logger.warning("Unsupported evaluation method: %s", evaluation_method)
-            return result_list, None
+            return None
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Sparse Retrieval Evaluation Script")
+    parser.add_argument('--embedding_method', type=str, choices=['tfidf', 'bm25'], required=True, help="Embedding method to use: 'tfidf' or 'bm25'")
+    parser.add_argument('--topk', type=int, required=True, help="Number of top documents to retrieve")
+    parser.add_argument('--evaluation_methods', type=str, nargs='+', default=['hit', 'mrr'], help="Evaluation methods to use: 'hit', 'mrr'")
+    return parser.parse_args()
+
+def append_to_csv(output_csv: str, row: dict, headers: List[str]):
+    file_exists = os.path.isfile(output_csv)
+    with open(output_csv, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=headers)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
+
 
 if __name__ == "__main__":
-    logger.info("Starting Sparse Retrieval System.")
+    args = parse_arguments()
 
+    # Initialize tokenizer
+    logger.info("Starting Sparse Retrieval System.")
     tokenizer_model = 'klue/bert-base'
     logger.info("Loading tokenizer model: %s", tokenizer_model)
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
 
-    use_faiss = False
-    logger.info("FAISS usage set to: %s", use_faiss)
+    logger.info("Embedding method: %s", args.embedding_method)
+    logger.info("Top-K: %d", args.topk)
+    logger.info("Evaluation method: %s", args.evaluation_methods)
 
     retriever = SparseRetrieval(
-        embedding_method = "bm25",  # 'tfidf','bm25'
+        embedding_method = args.embedding_method,  # 'tfidf','bm25'
         tokenizer=tokenizer,
-        topk = 10,
-        use_faiss = use_faiss,
+        topk = args.topk,
+        use_faiss = False,
         retrieval_data_path = '../../data/wikipedia_documents.json',
         eval_data_path = '../../data/train_dataset'
     )
 
+    # Record total start time
+    total_start_time = time.time()
+
+    # Load data
     logger.info("Loading data.")
     with timer("Load data"):
         retriever.load_data()
 
+    # Generate embeddings
     logger.info("Generating sparse embeddings.")
     with timer("Generate sparse embeddings"):
         retriever.get_sparse_embedding()
 
-    if use_faiss:
-        logger.info("Building FAISS index.")
-        with timer("Build FAISS index"):
-            retriever.build_faiss()
+    # Build FAISS index if needed
+    # if use_faiss:
+    #     logger.info("Building FAISS index.")
+    #     with timer("Build FAISS index"):
+    #         retriever.build_faiss()
     
+    # Evaluate
     logger.info("Evaluating retrieval performance.")
-    with timer("Evaluation"):
-        result_list, score = retriever.evaluate(evaluation_method='correct')
-    logger.info(f"Final Correct retrieval result: {score:.4f}")
+    evaluation_results = {}
+    inference_times = {}
+    for eval_method in args.evaluation_methods:
+        with timer(f"Evaluation {eval_method}"):
+            result = retriever.evaluate(evaluation_method=eval_method)
+            evaluation_results[eval_method] = result
+
+    # Record total end time
+    total_end_time = time.time()
+    total_time = total_end_time - total_start_time
+    logger.info(f"Total execution time: {total_time:.3f} s")
+
+    # Prepare row for CSV
+    row = {
+        "embedding_method": args.embedding_method,
+        "topk": args.topk,
+        "total_time_sec": f"{total_time:.3f}"
+    }
+
+    for eval_method, score in evaluation_results.items():
+        row[f"{eval_method}@k"] = f"{score:.4f}"
+
+    # Append to CSV
+    headers = ["embedding_method", "topk", "total_time_sec"] + [f"{method}@k" for method in args.evaluation_methods]
+    append_to_csv("test_sparse_embedding.csv", row, headers)
 
     logger.info("Sparse Retrieval System finished execution.")
