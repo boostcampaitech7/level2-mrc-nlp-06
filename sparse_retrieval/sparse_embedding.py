@@ -260,18 +260,42 @@ class SparseRetrieval:
 
             
         elif self.embedding_method == 'bm25':
+
+            tokenized_queries = [self.tokenize_fn.tokenize(query) for query in queries]
+            all_query_terms = set(term for query in tokenized_queries for term in query)
+
+            # 모든 단어에 대해 문서에서의 빈도 한 번에 계산
+            term_freq_matrix = np.array([[doc.get(term, 0) for doc in self.bm25.doc_freqs] for term in all_query_terms])
+
+            # IDF 벡터 계산
+            idf_vector = np.array([self.bm25.idf.get(term, 0) for term in all_query_terms])
+
+            # 모든 쿼리에 대해 BM25 점수를 벡터화 방식으로 계산
             doc_scores = []
             doc_indices = []
 
-            for query in tqdm(queries): # bm25는 한 쿼리씩 처리하도록 구성되어 있음. 많이 느림.
-                tokenized_query = self.tokenize_fn.tokenize(query)
-                doc_scores_for_query = self.bm25.get_scores(tokenized_query)
+            for tokenized_query in tqdm(tokenized_queries):
+                # 쿼리에서 등장한 단어들에 대한 인덱스를 선택
+                query_term_indices = [list(all_query_terms).index(term) for term in tokenized_query]
 
-                # 점수를 기준으로 상위 k개의 문서 선택
+                # 해당 단어들의 문서 내 빈도 추출
+                query_term_freqs = term_freq_matrix[query_term_indices, :]
+
+                # 벡터화된 BM25 점수 계산
+                doc_scores_for_query = np.sum(
+                    (idf_vector[query_term_indices][:, np.newaxis] *
+                    (query_term_freqs * (self.bm25.k1 + 1) /
+                    (query_term_freqs + self.bm25.k1 * (1 - self.bm25.b + self.bm25.b * np.array(self.bm25.doc_len) / self.bm25.avgdl)))),
+                    axis=0
+                )
+
+                # 상위 k개의 문서 선택
                 sorted_result = np.argsort(doc_scores_for_query)[::-1]
                 doc_scores.append(doc_scores_for_query[sorted_result].tolist()[:k])
                 doc_indices.append(sorted_result.tolist()[:k])
+
             return doc_scores, doc_indices
+        
 
     def evaluate(self, evaluation_method = 'correct'):
         org_dataset = load_from_disk(self.eval_data_path)
@@ -300,9 +324,9 @@ if __name__ == "__main__":
     use_faiss = False
 
     retriever = SparseRetrieval(
-        embedding_method = "tfidf",  # 'tfidf','bm25'
+        embedding_method = "bm25",  # 'tfidf','bm25'
         tokenize_fn=tokenize_fn,
-        topk = 50,
+        topk = 10,
         use_faiss = use_faiss,
         retrieval_data_path = '../../data/wikipedia_documents.json',
         eval_data_path = '../../data/train_dataset'
