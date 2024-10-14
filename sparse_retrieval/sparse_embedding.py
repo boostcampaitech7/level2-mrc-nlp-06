@@ -19,57 +19,77 @@ import logging
 import sys
 
 
-logger = logging.getLogger(__name__)
-
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
     datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
     handlers=[logging.StreamHandler(sys.stdout)],
 )
+logger = logging.getLogger(__name__)
 
 @contextmanager
 def timer(name):
     t0 = time.time()
-    yield
-    print(f"[{name}] done in {time.time() - t0:.3f} s")
+    try:
+        yield
+    finally:
+        elapsed = time.time() - t0
+        logger.info(f"[{name}] done in {elapsed:.3f} s")
+
+
+# file size
+def sizeof_fmt(num, suffix="B"):
+    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+        if abs(num) < 1024.0:
+            return f"{num:3.1f} {unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.1f} Y{suffix}"
+
 
 class SparseRetrieval:
     def __init__(
         self,
-        embedding_method,
-        tokenize_fn,
-        topk,
-        use_faiss = False,
+        embedding_method: str,
+        tokenizer,
+        topk: int,
+        use_faiss: bool = False,
         retrieval_data_path: Optional[str] = '../../data/wikipedia_documents.json',
         eval_data_path: Optional[str] = '../../data/train_dataset'
     ) -> NoReturn:
 
         self.embedding_method = embedding_method
-        self.tokenize_fn = tokenize_fn
+        self.tokenize_fn = tokenizer.tokenize
         self.topk = topk
         self.use_faiss = use_faiss
         self.retrieval_data_path = retrieval_data_path
         self.eval_data_path = eval_data_path
-        self.ids = None
         self.contexts = None
         self.indexer = None  # build_faiss()로 생성합니다.
+        self.tfidfv = None
+        self.p_embedding = None
+        self.bm25 = None
 
-    # wikipedia 데이터 가져오기
+    # load 'wikipedia_documents.json' data
     def load_data(self):
+        logger.info("Loading Wikipedia data from %s", self.retrieval_data_path)
+        if os.path.isfile(self.retrieval_data_path):
+            file_size = sizeof_fmt(os.path.getsize(self.retrieval_data_path))
+            logger.info("File size of %s: %s", self.retrieval_data_path, file_size)
+        else:
+            logger.warning("File %s does not exist.", self.retrieval_data_path)
+
         with open(self.retrieval_data_path, "r", encoding='utf-8') as f:
             wiki = json.load(f)
         
         # unique text 추출
         wiki_df = pd.DataFrame(wiki.values())
         wiki_unique_df = wiki_df.drop_duplicates(subset=['text'], keep='first')
-        self.ids = wiki_unique_df['document_id'].tolist()
         self.contexts = wiki_unique_df['text'].tolist()
         logger.info(f"Length of unique context: {len(self.contexts)}")
 
 
-    # TF-IDF 또는 BM25 방식 이용
+    # Generate sparse embedding for contexts (methods: TF-IDF | BM25)
     def get_sparse_embedding(self) -> NoReturn:
-
         pickle_name = f"{self.embedding_method}_sparse_embedding.bin"
         vectorizer_name = f"{self.embedding_method}.bin"
         emb_path = os.path.join(pickle_name)
@@ -77,39 +97,50 @@ class SparseRetrieval:
 
         if self.embedding_method == 'tfidf':
             if os.path.isfile(vectorizer_path) and os.path.isfile(emb_path):
+                logger.info("Loading TF-IDF pickle files.")
+                logger.info("File size of %s: %s", vectorizer_path, sizeof_fmt(os.path.getsize(vectorizer_path)))
+                logger.info("File size of %s: %s", emb_path, sizeof_fmt(os.path.getsize(emb_path)))
                 with open(vectorizer_path, "rb") as file:
                     self.tfidfv = pickle.load(file)
                 with open(emb_path, "rb") as file:
                     self.p_embedding = pickle.load(file)
-                logger.info("Loaded TF-IDF pickle files.")
             else:
                 logger.info("Build TF-IDF passage embedding")
                 self.tfidfv = TfidfVectorizer(
-                                        tokenizer=self.tokenize_fn.tokenize, 
-                                        ngram_range=(1, 2), 
-                                        max_features=50000
-                                    )
-                self.p_embedding = self.tfidfv.fit_transform(tqdm(self.contexts, desc="TF-IDF Vectorization"))
+                    tokenizer=self.tokenize_fn, 
+                    ngram_range=(1, 2), 
+                    max_features=50000
+                )
+                with timer("TF-IDF Vectorization"):
+                    self.p_embedding = self.tfidfv.fit_transform(
+                        tqdm(self.contexts, desc="TF-IDF Vectorization")
+                    )
 
+                logger.info("Saving TF-IDF pickle files.")
                 with open(vectorizer_path, "wb") as file:
                     pickle.dump(self.tfidfv, file)
+                logger.info("File %s saved with size %s", vectorizer_path, sizeof_fmt(os.path.getsize(vectorizer_path)))
                 with open(emb_path, "wb") as file:
                     pickle.dump(self.p_embedding, file)
+                logger.info("File %s saved with size %s", emb_path, sizeof_fmt(os.path.getsize(emb_path)))
                 logger.info("Embedding pickle saved.")
 
         elif self.embedding_method == 'bm25':
-            if os.path.isfile(vectorizer_path):  # bm25는 embedding 저장/사용되지 않음
+            if os.path.isfile(vectorizer_path):  # bm25 does not use p_embedding
+                logger.info("Loading BM25 pickle file.")
+                logger.info("File size of %s: %s", vectorizer_path, sizeof_fmt(os.path.getsize(vectorizer_path)))
                 with open(vectorizer_path, "rb") as file:
                     self.bm25 = pickle.load(file)
-                logger.info("Loaded BM25 pickle file.")
             else:
-                logger.info("Fit BM25")
-                tokenized_corpus = [self.tokenize_fn.tokenize(doc) for doc in tqdm(self.contexts, desc="Tokenizing for BM25")]
+                logger.info("Fitting BM25 model.")
+                tokenized_corpus = [self.tokenize_fn(doc) for doc in tqdm(self.contexts, desc="Tokenizing for BM25")]
                 self.bm25 = BM25Okapi(tokenized_corpus)
 
+                logger.info("Saving BM25 pickle file.")
                 with open(vectorizer_path, "wb") as file:
                     pickle.dump(self.bm25, file)
-                logger.info("BM25 pickle saved.")
+                logger.info("File %s saved with size %s", vectorizer_path, sizeof_fmt(os.path.getsize(vectorizer_path)))
+                logger.info("BM25 model saved.")
         
 
     def build_faiss(self, num_clusters=64) -> NoReturn:
@@ -118,15 +149,15 @@ class SparseRetrieval:
         indexer_name = f"{self.embedding_method}_faiss_clusters{num_clusters}.index"
         indexer_path = os.path.join(indexer_name)
         if os.path.isfile(indexer_path):
-            logger.info("Load Saved Faiss Indexer.")
+            logger.info("Loading saved Faiss indexer from %s.", indexer_path)
+            logger.info("File size of %s: %s", indexer_path, sizeof_fmt(os.path.getsize(indexer_path)))
             self.indexer = faiss.read_index(indexer_path)
         else:
-            logger.info(f"Creating FAISS indexer from embeddings with num_clusters {num_clusters}.")
+            logger.info(f"Creating FAISS indexer with {num_clusters} clusters.")
             p_emb = self.p_embedding.astype(np.float32).toarray()
             emb_dim = p_emb.shape[-1]
 
-            num_clusters = num_clusters
-            quantizer = faiss.IndexFlatL2(emb_dim)  ###TODO: L2 외의 다른 Metric 적용
+            quantizer = faiss.IndexFlatL2(emb_dim)
             self.indexer = faiss.IndexIVFScalarQuantizer(
                 quantizer, quantizer.d, num_clusters, faiss.METRIC_L2
             )
@@ -135,70 +166,65 @@ class SparseRetrieval:
             with timer("Add p_embedddings to FAISS indexer"):
                 self.indexer.add(p_emb)
             faiss.write_index(self.indexer, indexer_path)
-            print("Faiss Indexer Saved.")
+            logger.info("Faiss indexer saved to %s.", indexer_path)
+            logger.info("File size of %s: %s", indexer_path, sizeof_fmt(os.path.getsize(indexer_path)))
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, use_faiss: Optional[bool] = False
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List, List], pd.DataFrame]:
 
         if self.use_faiss:
             assert self.indexer is not None, "build_faiss() 메소드를 먼저 수행해주세요."
+            logger.debug("Using FAISS for retrieval.")
         else:
             if self.embedding_method == 'tfidf':
                 assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해주세요."
+                logger.debug("Using TF-IDF for retrieval.")
             elif self.embedding_method == 'bm25':
                 assert self.bm25 is not None, "get_sparse_embedding() 메소드를 먼저 수행해주세요."
+                logger.debug("Using BM25 for retrieval.")
 
 
         if isinstance(query_or_dataset, str):
-            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk, use_faiss=self.use_faiss)
-            print("[Search query]\n", query_or_dataset, "\n")
+            logger.info("Retrieving for single query.")
+            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
+            logger.info(f"[Search query]\n{query_or_dataset}\n")
 
             for i in range(topk):
-                print(f"Top-{i+1} passage with score {doc_scores[i]:4f}")
-                print(self.contexts[doc_indices[i]])
+                logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
+                logger.debug(f"Passage: {self.contexts[doc_indices[i]]}")
 
             return (doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)])
 
         elif isinstance(query_or_dataset, Dataset):
-
-            # 여러 쿼리에 대한 처리
+            logger.info("Retrieving for dataset queries.")
             queries = query_or_dataset["question"]
-            retrieved_data = []  # 결과를 저장할 딕셔너리 리스트
+            retrieved_data = []  # dictionary list to save result
 
             with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(queries, k=topk, use_faiss=self.use_faiss)
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(queries, k=topk)
             
-            for idx, example in enumerate(
-                tqdm(query_or_dataset, desc="Sparse retrieval: ")
-            ):
+            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
                 result = {
                     "question": example["question"],
                     "id": example["id"],
-                    "context": [self.contexts[pid] for pid in doc_indices[idx]]  # 리스트 형태로 반환
+                    "context": [self.contexts[pid] for pid in doc_indices[idx]]  # format: list
                 }
                 if "context" in example.keys() and "answers" in example.keys():
                     result["original_context"] = example["context"]
                     result["answers"] = example["answers"]
                 retrieved_data.append(result)
 
+            logger.info("Completed retrieval for dataset queries.")
             return retrieved_data
 
-    def get_relevant_doc(self, query: str, k: Optional[int] = 1, use_faiss: Optional[bool] = False) -> Tuple[List, List]:
-
-        """
-        Arguments:
-            query (str):
-                하나의 Query를 받습니다.
-            k (Optional[int]): 1
-                상위 몇 개의 Passage를 반환할지 정합니다.
-        Note:
-            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
-        """
+    def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
 
         if self.embedding_method == 'tfidf':
             query_vec = self.tfidfv.transform([query])
-            assert (np.sum(query_vec) != 0), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
+            if query_vec.nnz == 0:
+                logger.warning("Query contains only unknown words.")
+                raise ValueError("오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다.")
 
             if self.use_faiss:
                 q_emb = query_vec.toarray().astype(np.float32)
@@ -215,7 +241,7 @@ class SparseRetrieval:
                 return doc_score, doc_indices
             
         elif self.embedding_method == 'bm25':
-            tokenized_query = self.tokenize_fn.tokenize(query)
+            tokenized_query = self.tokenize_fn(query)
             doc_scores = self.bm25.get_scores(tokenized_query)
 
             sorted_result = np.argsort(doc_scores)[::-1]
@@ -224,23 +250,13 @@ class SparseRetrieval:
             return doc_score, doc_indices
 
 
-    def get_relevant_doc_bulk(
-        self, queries: List, k: Optional[int] = 1, use_faiss: Optional[bool] = False
-    ) -> Tuple[List, List]:
-
-        """
-        Arguments:
-            queries (List):
-                하나의 Query를 받습니다.
-            k (Optional[int]): 1
-                상위 몇 개의 Passage를 반환할지 정합니다.
-        Note:
-            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
-        """
+    def get_relevant_doc_bulk(self, queries: List, k: Optional[int] = 1) -> Tuple[List, List]:
 
         if self.embedding_method == 'tfidf':
             query_vecs = self.tfidfv.transform(queries)
-            assert (np.sum(query_vecs) != 0), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
+            if query_vecs.nnz == 0:
+                logger.warning("One or more queries contain only unknown words.")
+                raise ValueError("오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다.")
 
             if self.use_faiss:
                 q_emb = query_vecs.toarray().astype(np.float32)
@@ -260,21 +276,19 @@ class SparseRetrieval:
 
             
         elif self.embedding_method == 'bm25':
-
-            tokenized_queries = [self.tokenize_fn.tokenize(query) for query in queries]
+            tokenized_queries = [self.tokenize_fn(query) for query in queries]
             all_query_terms = set(term for query in tokenized_queries for term in query)
 
-            # 모든 단어에 대해 문서에서의 빈도 한 번에 계산
+            # frequency matrix for all query terms to all documents
             term_freq_matrix = np.array([[doc.get(term, 0) for doc in self.bm25.doc_freqs] for term in all_query_terms])
 
-            # IDF 벡터 계산
+            # calculate IDF vector
             idf_vector = np.array([self.bm25.idf.get(term, 0) for term in all_query_terms])
 
-            # 모든 쿼리에 대해 BM25 점수를 벡터화 방식으로 계산
             doc_scores = []
             doc_indices = []
 
-            for tokenized_query in tqdm(tokenized_queries):
+            for tokenized_query in tqdm(tokenized_queries, desc="Calculating BM25 scores"):
                 # 쿼리에서 등장한 단어들에 대한 인덱스를 선택
                 query_term_indices = [list(all_query_terms).index(term) for term in tokenized_query]
 
@@ -284,8 +298,8 @@ class SparseRetrieval:
                 # 벡터화된 BM25 점수 계산
                 doc_scores_for_query = np.sum(
                     (idf_vector[query_term_indices][:, np.newaxis] *
-                    (query_term_freqs * (self.bm25.k1 + 1) /
-                    (query_term_freqs + self.bm25.k1 * (1 - self.bm25.b + self.bm25.b * np.array(self.bm25.doc_len) / self.bm25.avgdl)))),
+                      (query_term_freqs * (self.bm25.k1 + 1) /
+                        (query_term_freqs + self.bm25.k1 * (1 - self.bm25.b + self.bm25.b * np.array(self.bm25.doc_len) / self.bm25.avgdl)))),
                     axis=0
                 )
 
@@ -297,7 +311,8 @@ class SparseRetrieval:
             return doc_scores, doc_indices
         
 
-    def evaluate(self, evaluation_method = 'correct'):
+    def evaluate(self, evaluation_method = 'hit_at_k'):
+        logger.info("Loading evaluation dataset from %s", self.eval_data_path)
         org_dataset = load_from_disk(self.eval_data_path)
         eval_df = concatenate_datasets(
             [
@@ -305,36 +320,55 @@ class SparseRetrieval:
                 org_dataset["validation"].flatten_indices(),
             ]
         )
-        logger.info(eval_df)
+        logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
 
-        result_list = self.retrieve(eval_df, topk=self.topk, use_faiss=self.use_faiss)
-        if evaluation_method == 'correct':
-            correct = []
+        result_list = self.retrieve(eval_df, topk=self.topk)
+        if evaluation_method == 'hit_at_k':  # k개의 추천 중 선호 아이템이 있는지 측정
+            hit = []
             for example in result_list:
-                correct.append(example['original_context'] in example['context'])
-            score = sum(correct)/len(correct)
-            logger.info(f"Correct retrieval result: {score}")
+                hit.append(example['original_context'] in example['context'])
+            score = sum(hit)/len(hit)
+            logger.info(f"retrieval result (Hit@K): {score:.4f}")
             return result_list, score
+        else:
+            logger.warning("Unsupported evaluation method: %s", evaluation_method)
+            return result_list, None
 
 if __name__ == "__main__":
+    logger.info("Starting Sparse Retrieval System.")
 
     tokenizer_model = 'klue/bert-base'
-    tokenize_fn = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    logger.info("Loading tokenizer model: %s", tokenizer_model)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
 
     use_faiss = False
+    logger.info("FAISS usage set to: %s", use_faiss)
 
     retriever = SparseRetrieval(
         embedding_method = "bm25",  # 'tfidf','bm25'
-        tokenize_fn=tokenize_fn,
+        tokenizer=tokenizer,
         topk = 10,
         use_faiss = use_faiss,
         retrieval_data_path = '../../data/wikipedia_documents.json',
         eval_data_path = '../../data/train_dataset'
     )
-    retriever.load_data()
-    retriever.get_sparse_embedding()
+
+    logger.info("Loading data.")
+    with timer("Load data"):
+        retriever.load_data()
+
+    logger.info("Generating sparse embeddings.")
+    with timer("Generate sparse embeddings"):
+        retriever.get_sparse_embedding()
+
     if use_faiss:
-        retriever.build_faiss()
+        logger.info("Building FAISS index.")
+        with timer("Build FAISS index"):
+            retriever.build_faiss()
     
-    result_list, score = retriever.evaluate(evaluation_method = 'correct')
-    print(f"Correct retrieval result: {score}")
+    logger.info("Evaluating retrieval performance.")
+    with timer("Evaluation"):
+        result_list, score = retriever.evaluate(evaluation_method='correct')
+    logger.info(f"Final Correct retrieval result: {score:.4f}")
+
+    logger.info("Sparse Retrieval System finished execution.")
