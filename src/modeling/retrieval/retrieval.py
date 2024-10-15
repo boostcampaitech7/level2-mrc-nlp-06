@@ -1,5 +1,8 @@
-import sys, os
+import os
+import sys
+import json
 import argparse
+import pandas as pd
 from datasets import load_from_disk
 from transformers import TrainingArguments
 
@@ -17,6 +20,19 @@ if __name__ == '__main__':
     pool = config.model.pool=="True"
     metric = config.model.metric
     wiki_path = os.path.join(config.data_path, 'wiki_unique.csv')
+
+    if not os.path.isfile(wiki_path):
+        print("========== creating wiki_unique.csv ==========")
+        wiki_json_path = os.path.join(config.data_path, 'wikipedia_documents.json')
+        with open(wiki_json_path, 'r', encoding='utf-8') as f:
+            wiki_json = json.load(f)
+
+        wiki_list = [wiki_json[str(i)] for i in range(len(wiki_json))]
+        wiki_df = pd.DataFrame(wiki_list)
+        wiki_unique = wiki_df.drop_duplicates(subset='text', keep='first')
+
+        wiki_unique.to_csv(os.path.join(config.data_path, 'wiki_unique.csv'))
+        print(f"saved to {wiki_path}")
 
     retrieval = DenseRetrieval(config.model.name, pool=pool, metric=metric)
 
@@ -41,5 +57,5 @@ if __name__ == '__main__':
         retrieval.validate(validation_dataset, int(config.topk), wiki_path, config.train.output_dir)
 
     if args.task=="predict":
-        test_dataset = load_from_disk(os.path.join(config.data_path, 'test_dataset'))['validation']
+        test_dataset = load_from_disk(os.path.join(config.data_path, 'test_dataset'))['validation'] # 데이터셋에 따라 train_dataset, test_dataset 구분
         retrieval.retrieve(test_dataset, int(config.topk), wiki_path, config.train.output_dir)

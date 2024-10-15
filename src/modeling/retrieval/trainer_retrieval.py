@@ -16,12 +16,7 @@ class DenseRetrieval():
         self.pool = pool
         self.metric = metric
 
-        self.q_model = AutoModel.from_pretrained(model_name)
-        self.c_model = AutoModel.from_pretrained(model_name)
-
         self.device = 'cuda' if torch.cuda.is_available else 'cpu'
-        self.q_model.to(self.device)
-        self.c_model.to(self.device)
 
         self.tokenizer = Tokenizer(self.model_name)
 
@@ -36,6 +31,12 @@ class DenseRetrieval():
             self.questions = self.tokenizer.question_tokenizer(data)
 
     def train(self, args, data):
+        self.q_model = AutoModel.from_pretrained(self.model_name)
+        self.c_model = AutoModel.from_pretrained(self.model_name)
+
+        self.q_model.to(self.device)
+        self.c_model.to(self.device)
+
         self.preprocess(data, is_train=True)
         
         train_dataloader = DataLoader(self.dataset, batch_size=args.per_device_train_batch_size)
@@ -167,21 +168,25 @@ class DenseRetrieval():
             sim_scores = torch.cat(sim_scores, dim=0)
         rank = torch.argsort(sim_scores, dim=1, descending=True).squeeze()
         
-        cnt = 0
+        hit = 0
+        mrr = 0
         for i in range(sim_scores.shape[0]):
             context = []
             for k in range(topk):
                 context.append(corpus[rank[i][k].item()])
             
             if valid_data['context'][i] in context:
-                cnt += 1
+                hit += 1
+                mrr += 1 / (context.index(valid_data['context'][i]) + 1)
 
-        print(f"{cnt} out of {len(valid_data['question'])}")
+        hit = hit / len(valid_data['question'])
+        mrr = mrr / len(valid_data['question'])
+        print(f"Hit@k: {hit}, 'MRR@k: {mrr}")
         
-        return cnt/len(valid_data['question'])
+        return {'hit': hit, 'mrr': mrr}
 
     def retrieve(self, test_data, topk, corpus_path=None, model_path=None):
-        question_contexts = pd.DataFrame(columns=['question', 'context', 'scores'])
+        # question_contexts = pd.DataFrame(columns=['question', 'context', 'scores'])
 
         self.q_model = AutoModel.from_pretrained(os.path.join(model_path, 'q_encoder'))
         self.q_model.to(self.device)
@@ -214,12 +219,21 @@ class DenseRetrieval():
             sim_scores = torch.cat(sim_scores, dim=0)
         rank = torch.argsort(sim_scores, dim=1, descending=True).squeeze()
         
+        new_df = pd.DataFrame(test_data)
+        # train, validation, test dataset에 따라 서로 다른 형태로 반환해야 함
+        if 'context' in test_data.column_names:
+            new_df = new_df.drop(columns=['__index_level_0__', 'title', 'document_id'])
+            new_df['original_context'] = new_df['context']
+        else:
+            new_df = pd.DataFrame(test_data)
+            new_df['context'] = ''
+        
         for i in tqdm(range(sim_scores.shape[0]), desc='Q&A pair'):
             context = []
-            scores = []
             for k in range(topk):
-                scores.append(sim_scores[i].squeeze()[rank[i][k]])
                 context.append(corpus[rank[i][k].item()])
-            question_contexts.loc[i] = [test_data['question'][i], context, scores]
-        
-        question_contexts.to_csv('./test_dataset.csv')
+            new_df.loc[i, 'context'] = ' '.join(context)
+
+        # new_df.to_csv(os.path.join(model_path, 'new_context.csv'))
+
+        return new_df 
