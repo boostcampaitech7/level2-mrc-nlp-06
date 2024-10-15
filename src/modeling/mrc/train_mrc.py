@@ -65,11 +65,11 @@ def main():
         training_args.do_eval=False
 
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"data is from {data_args.train_dataset_name}")
 
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    datasets = load_from_disk(data_args.train_dataset_name)
     print(datasets)
 
     config = AutoConfig.from_pretrained(
@@ -95,7 +95,6 @@ def main():
             config=config
         )
 
-    
 
     print(
         type(training_args),
@@ -205,7 +204,8 @@ def run_mrc_generation(
         num_train_epochs=training_args.num_train_epochs,
         save_strategy='epoch',
         save_total_limit=1 # 모델 checkpoint를 최대 몇개 저장할지 설정
-    )  
+    )
+
     trainer = Seq2SeqTrainer(
         model=model,
         args=args,
@@ -251,7 +251,7 @@ def run_mrc_generation(
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate(max_length=128,
-                                   num_beams=4,
+                                   num_beams=3,
                                    metric_key_prefix="eval")
 
         metrics["eval_samples"] = len(eval_dataset)
@@ -327,6 +327,7 @@ def run_mrc_extract(
 
     # Set metric
     metric = load_metric("squad")
+
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
