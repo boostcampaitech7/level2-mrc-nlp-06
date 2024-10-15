@@ -32,7 +32,7 @@ if __name__ == '__main__':
         wiki_unique.to_csv(os.path.join(config.data_path, 'wiki_unique.csv'))
         print(f"saved to {wiki_path}")
 
-    retrieval = DenseRetrieval(config.model.name, pool=config.model.pool, metric=config.model.metric)
+    retrieval = DenseRetrieval(config.model.name, pool=pool, metric=metric)
 
     if args.task=="train":        
         train_dataset = load_from_disk(os.path.join(config.data_path, 'train_dataset'))
