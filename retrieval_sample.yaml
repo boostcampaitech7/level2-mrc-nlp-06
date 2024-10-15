@@ -1,0 +1,13 @@
+data_path: ../data # wikipedia_documents.json 대신 wiki_name의 csv 파일 필요
+wiki_path: ./wiki_unique.csv
+model: 
+  name: klue/roberta-base
+  pool: True
+  metric: dot
+train:
+  output_dir: ./dense_retrieval
+  epoch: 1
+  learning_rate: 2e-5
+  batch_size: 16
+  weight_decay: 0.01
+topk: 5
