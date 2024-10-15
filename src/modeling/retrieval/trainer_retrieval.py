@@ -85,8 +85,10 @@ class DenseRetrieval():
                     q_outputs = torch.mean(q_outputs['last_hidden_state'], dim=1)
                     c_outputs = torch.mean(c_outputs['last_hidden_state'], dim=1)
                 else:
-                    q_outputs = q_outputs['pooler_output']
-                    c_outputs = c_outputs['pooler_output']
+                    # q_outputs = q_outputs['pooler_output']
+                    # c_outputs = c_outputs['pooler_output']
+                    q_outputs = q_outputs[0][:, 0, :]
+                    c_outputs = c_outputs[0][:, 0, :]
             
                 if self.metric=='dot':
                     sim_scores = torch.matmul(q_outputs, torch.transpose(c_outputs, 0, 1))
