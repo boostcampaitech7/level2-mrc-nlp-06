@@ -3,11 +3,13 @@ import json
 import sys
 import os
 import pickle
+import gzip
 import time
 from contextlib import contextmanager
 from typing import List, NoReturn, Optional, Tuple, Union
 
 import numpy as np
+from scipy import sparse
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForMaskedLM
 from datasets import Dataset, concatenate_datasets, load_from_disk
@@ -105,73 +107,79 @@ class LearnedSparseRetrieval:
     def get_sparse_embedding(self, batch_size: int = 8) -> NoReturn:
         pickle_name = f"{self.embedding_method}_sparse_embedding_agg-{self.aggregation_method}_similarity-{self.similarity_metric}.bin"
         emb_path = os.path.join(pickle_name)
+        # batch_file_template = "./batch/batch_embedding_{}.bin"
 
         if os.path.isfile(emb_path):
             logger.info("Loading BGE-M3 pickle file.")
             logger.info(
                 "File size of %s: %s", emb_path, sizeof_fmt(os.path.getsize(emb_path))
             )
-            with open(emb_path, "rb") as file:
+            with gzip.open(emb_path, "rb") as file:
                 self.p_embedding = pickle.load(file)
         else:
             logger.info("Generating embeddings using %s.", self.embedding_method)
-            with torch.no_grad():
-                all_embeddings = []
-                dataloader = DataLoader(self.contexts, batch_size=batch_size)
+            dataloader = DataLoader(self.contexts, batch_size=batch_size)
+            all_embeddings = []
+            # batch_idx = 0
+            # batch_files = []
 
-                with timer("BGE-M3 Embedding Generation"):
-                    for batch in tqdm(dataloader, desc="Generating Passage Embeddings"):
-                        encoded_input = self.tokenizer(
-                            batch, padding=True, truncation=True, return_tensors="pt"
-                        ).to(self.device)
+            with timer("BGE-M3 Embedding Generation"):
+                for batch in tqdm(dataloader, desc="Generating Passage Embeddings"):
+                    encoded_input = self.tokenizer(
+                        batch, padding=True, truncation=True, return_tensors="pt"
+                    ).to(self.device)
 
-                        with torch.no_grad():
-                            model_output = self.encoder(**encoded_input)
+                    with torch.no_grad():
+                        model_output = self.encoder(**encoded_input)
 
-                            # Pooling
-                            logits = model_output.logits
-                            attention_mask = encoded_input["attention_mask"]
-                            relu_log = torch.log(1 + torch.relu(logits))
-                            weighted_log = relu_log * attention_mask.unsqueeze(-1)
+                        # Pooling
+                        logits = model_output.logits
+                        attention_mask = encoded_input["attention_mask"]
+                        relu_log = torch.log(1 + torch.relu(logits))
+                        weighted_log = relu_log * attention_mask.unsqueeze(-1)
 
-                            if self.aggregation_method == "sum":
-                                values = torch.sum(weighted_log, dim=1)
-                            elif self.aggregation_method == "max":
-                                values, _ = torch.max(weighted_log, dim=1)
-                            else:
-                                raise ValueError(
-                                    f"Unsupported aggregation method: {self.aggregation_method}"
-                                )
+                        if self.aggregation_method == "sum":
+                            values = torch.sum(weighted_log, dim=1)
+                        elif self.aggregation_method == "max":
+                            values, _ = torch.max(weighted_log, dim=1)
+                        else:
+                            raise ValueError(
+                                f"Unsupported aggregation method: {self.aggregation_method}"
+                            )
 
-                            # normalization for cosine similarity
-                            if self.similarity_metric == "cosine":
-                                eps = 1e-9
-                                values = values / (
-                                    torch.norm(values, dim=-1, keepdim=True) + eps
-                                )
+                        # normalization for cosine similarity
+                        if self.similarity_metric == "cosine":
+                            eps = 1e-9
+                            values = values / (
+                                torch.norm(values, dim=-1, keepdim=True) + eps
+                            )
 
-                            batch_embedding = values.squeeze()
-                            all_embeddings.append(batch_embedding.cpu().numpy())
+                        batch_embedding = values.squeeze().cpu().numpy()
+                        all_embeddings.append(batch_embedding)
 
-                        # GPU 캐시 삭제
-                        del (
-                            encoded_input,
-                            model_output,
-                            weighted_log,
-                            relu_log,
-                            values,
-                            batch_embedding,
-                        )
-                        torch.cuda.empty_cache()
+                        # with gzip.open(emb_path, "ab") as file:
+                        #     pickle.dump(batch_embedding, file)
 
-                    self.p_embedding = np.vstack(all_embeddings).astype(np.float32)
-                    logger.info(
-                        f"Generated passage embeddings shape: {self.p_embedding.shape}"
+                    # GPU 캐시 삭제
+                    del (
+                        encoded_input,
+                        model_output,
+                        weighted_log,
+                        relu_log,
+                        values,
+                        batch_embedding,
                     )
+                    torch.cuda.empty_cache()
+
+                all_embeddings = np.vstack(all_embeddings).astype(np.float32)
+                self.p_embedding = sparse.csr_matrix(all_embeddings)
+                logger.info(
+                    f"Generated passage embeddings shape: {self.p_embedding.shape}"
+                )
 
             # Save embeddings to file
             logger.info("Saving embeddings to %s", emb_path)
-            with open(emb_path, "wb") as file:
+            with gzip.open(emb_path, "wb") as file:
                 pickle.dump(self.p_embedding, file)
             logger.info(
                 "File %s saved with size %s",
