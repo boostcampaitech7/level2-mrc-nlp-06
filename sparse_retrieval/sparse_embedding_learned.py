@@ -2,8 +2,6 @@ import logging
 import json
 import sys
 import os
-import pickle
-import gzip
 import time
 from contextlib import contextmanager
 from typing import List, NoReturn, Optional, Tuple, Union
@@ -58,6 +56,7 @@ class LearnedSparseRetrieval:
         topk: int,
         retrieval_data_path: Optional[str] = "../../data/wikipedia_documents.json",
         eval_data_path: Optional[str] = "../../data/train_dataset",
+        batch_save_interval: int = 10,
     ) -> NoReturn:
 
         # Validate embedding method
@@ -81,9 +80,11 @@ class LearnedSparseRetrieval:
 
         self.retrieval_data_path = retrieval_data_path
         self.eval_data_path = eval_data_path
+        self.batch_save_interval = batch_save_interval
 
         self.contexts = None
         self.p_embedding = None
+        self.p_embedding_norm = None  # For cosine similarity
 
     # load 'wikipedia_documents.json' data
     def load_data(self):
@@ -101,27 +102,33 @@ class LearnedSparseRetrieval:
         wiki_df = pd.DataFrame(wiki.values())
         wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
         self.contexts = wiki_unique_df["text"].tolist()
+        self.contexts = self.contexts[:100]
         logger.info(f"Length of unique context: {len(self.contexts)}")
 
     # Generate sparse embedding for contexts (methods: BGE-M3)
     def get_sparse_embedding(self, batch_size: int = 8) -> NoReturn:
-        pickle_name = f"{self.embedding_method}_sparse_embedding_agg-{self.aggregation_method}_similarity-{self.similarity_metric}.bin"
-        emb_path = os.path.join(pickle_name)
-        # batch_file_template = "./batch/batch_embedding_{}.bin"
+        embedding_dir = f"bge-m3_embeddings/{self.aggregation_method}"
+        os.makedirs(embedding_dir, exist_ok=True)
 
-        if os.path.isfile(emb_path):
-            logger.info("Loading BGE-M3 pickle file.")
-            logger.info(
-                "File size of %s: %s", emb_path, sizeof_fmt(os.path.getsize(emb_path))
-            )
-            with gzip.open(emb_path, "rb") as file:
-                self.p_embedding = pickle.load(file)
+        # Check if embeddings are already saved in batch files
+        existing_files = sorted(
+            [f for f in os.listdir(embedding_dir) if f.endswith(".npz")]
+        )
+
+        if existing_files:
+            logger.info("Loading existing batch embedding files.")
+            batch_embeddings = []
+            for file in tqdm(existing_files, desc="Loading batch embeddings"):
+                batch_path = os.path.join(embedding_dir, file)
+                batch_data = sparse.load_npz(batch_path)
+                batch_embeddings.append(batch_data)
+            self.p_embedding = sparse.vstack(batch_embeddings).toarray()
+            logger.info(f"Loaded p_embedding shape: {self.p_embedding.shape}")
         else:
             logger.info("Generating embeddings using %s.", self.embedding_method)
             dataloader = DataLoader(self.contexts, batch_size=batch_size)
-            all_embeddings = []
-            # batch_idx = 0
-            # batch_files = []
+            batch_counter = 0
+            current_batch_embeddings = []
 
             with timer("BGE-M3 Embedding Generation"):
                 for batch in tqdm(dataloader, desc="Generating Passage Embeddings"):
@@ -147,18 +154,10 @@ class LearnedSparseRetrieval:
                                 f"Unsupported aggregation method: {self.aggregation_method}"
                             )
 
-                        # normalization for cosine similarity
-                        if self.similarity_metric == "cosine":
-                            eps = 1e-9
-                            values = values / (
-                                torch.norm(values, dim=-1, keepdim=True) + eps
-                            )
-
-                        batch_embedding = values.squeeze().cpu().numpy()
-                        all_embeddings.append(batch_embedding)
-
-                        # with gzip.open(emb_path, "ab") as file:
-                        #     pickle.dump(batch_embedding, file)
+                        batch_embedding = (
+                            values.squeeze().cpu().numpy().astype(np.float16)
+                        )
+                        current_batch_embeddings.append(batch_embedding)
 
                     # GPU 캐시 삭제
                     del (
@@ -170,21 +169,46 @@ class LearnedSparseRetrieval:
                         batch_embedding,
                     )
                     torch.cuda.empty_cache()
+                    batch_counter += 1
 
-                all_embeddings = np.vstack(all_embeddings).astype(np.float32)
-                self.p_embedding = sparse.csr_matrix(all_embeddings)
-                logger.info(
-                    f"Generated passage embeddings shape: {self.p_embedding.shape}"
+                    # 일정 간격마다 배치 저장
+                    if batch_counter % self.batch_save_interval == 0:
+                        batch_array = np.vstack(current_batch_embeddings)
+                        sparse_batch = sparse.csr_matrix(batch_array)
+                        batch_file = os.path.join(
+                            embedding_dir, f"batch_{batch_counter}.npz"
+                        )
+                        logger.info(f"Saving batch {batch_counter} to {batch_file}")
+                        sparse.save_npz(batch_file, sparse_batch)
+                        current_batch_embeddings = []  # 초기화
+
+                # 남은 배치 저장
+                if current_batch_embeddings:
+                    batch_array = np.vstack(current_batch_embeddings)
+                    sparse_batch = sparse.csr_matrix(batch_array)
+                    batch_file = os.path.join(
+                        embedding_dir, f"batch_{batch_counter}.npz"
+                    )
+                    logger.info(f"Saving final batch {batch_counter} to {batch_file}")
+                    sparse.save_npz(batch_file, sparse_batch)
+
+                # 모든 배치 파일을 로드하여 p_embedding 구성
+                all_files = sorted(
+                    [f for f in os.listdir(embedding_dir) if f.endswith(".npz")]
                 )
+                batch_embeddings = []
+                for file in tqdm(all_files, desc="Loading saved batch embeddings"):
+                    batch_path = os.path.join(embedding_dir, file)
+                    batch_data = sparse.load_npz(batch_path)
+                    batch_embeddings.append(batch_data)
+                self.p_embedding = sparse.vstack(batch_embeddings).toarray()
+                logger.info(f"Generated p_embedding shape: {self.p_embedding.shape}")
 
-            # Save embeddings to file
-            logger.info("Saving embeddings to %s", emb_path)
-            with gzip.open(emb_path, "wb") as file:
-                pickle.dump(self.p_embedding, file)
-            logger.info(
-                "File %s saved with size %s",
-                emb_path,
-                sizeof_fmt(os.path.getsize(emb_path)),
+        # **Normalization을 나중에 적용하기 위해 p_embedding_norm 계산**
+        if self.similarity_metric == "cosine":
+            eps = 1e-9
+            self.p_embedding_norm = (
+                np.linalg.norm(self.p_embedding, axis=1, keepdims=True) + eps
             )
 
     def retrieve(
@@ -262,11 +286,15 @@ class LearnedSparseRetrieval:
                 eps = 1e-9
                 values = values / (torch.norm(values, dim=-1, keepdim=True) + eps)
 
-            q_embedding = values.squeeze().cpu().numpy().astype(np.float32)
+            q_embedding = values.squeeze().cpu().numpy().astype(np.float16)
 
         # Clear GPU cache
         del query_vec, model_output, weighted_log, relu_log, values
         torch.cuda.empty_cache()
+
+        # 정규화
+        if self.similarity_metric == "cosine":
+            self.p_embedding = self.p_embedding / self.p_embedding_norm
 
         # 연관 문서 찾기
         similarity_scores = np.dot(q_embedding, self.p_embedding.T)
@@ -326,10 +354,14 @@ class LearnedSparseRetrieval:
             )
             torch.cuda.empty_cache()
 
-        q_embedding = np.vstack(all_embeddings).astype(np.float32)
+        q_embedding = np.vstack(all_embeddings).astype(np.float16)
+
+        # 정규화
+        if self.similarity_metric == "cosine":
+            self.p_embedding = self.p_embedding / self.p_embedding_norm
 
         # 연관 문서 찾기
-        similarity_scores = np.dot(q_embedding, self.p_embedding.T)
+        similarity_scores = q_embedding.dot(self.p_embedding.T)
         if not isinstance(similarity_scores, np.ndarray):
             similarity_scores = similarity_scores.toarray()
 
@@ -458,6 +490,7 @@ if __name__ == "__main__":
         topk=args.topk,
         retrieval_data_path="../../data/wikipedia_documents.json",
         eval_data_path="../../data/train_dataset",
+        batch_save_interval=10,
     )
 
     # Record total start time
