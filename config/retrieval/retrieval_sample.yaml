@@ -1,5 +1,4 @@
 data_path: ../data # wikipedia_documents.json 대신 wiki_name의 csv 파일 필요
-wiki_path: ./wiki_unique.csv
 model: 
   name: klue/roberta-base
   pool: True

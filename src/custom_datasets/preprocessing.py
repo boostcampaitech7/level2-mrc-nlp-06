@@ -1,5 +1,3 @@
-
-
 def get_train_dataset(tokenizer, data_args, training_args, datasets, column_names, qca_names
                       ,pad_on_right):
 

@@ -40,51 +40,12 @@ from transformers import (
 
 
 from utils.utils_qa import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from utils.utils_common import dict_to_json
 
 logger = logging.getLogger(__name__)
 
 
-def main():
-    # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
-    # --help flag 를 실행시켜서 확인할 수 도 있습니다.
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="config 폴더에 있는 json 파일을 로드하세요", default="./config/reader/base_config.json")
-    parser.add_argument("--pred_dir", help="Prediction 폴더 설정", default="./predictions")
-    parser.add_argument("--do_predict", action="store_true", required=True, help="Predict할 경우 활성화")
-    parser.add_argument("--do_eval", action="store_true", help="Eval도 같이 할 경우에 활성화")
-    
-    args = parser.parse_args()
-    model_args, data_args, training_args = json_to_Arguments(args.config)
-    
-    training_args = TrainingArguments(**training_args)
-    training_args.output_dir = args.pred_dir
-    if args.do_predict:
-        training_args.do_predict = True
-    
-    if args.do_eval:
-        training_args.do_eval = True
-    
-    print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.test_dataset_name}")
-
-    # logging 설정
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-
-
-    # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
-    logger.info("Training/evaluation parameters %s", training_args)
-
-    # 모델을 초기화하기 전에 난수를 고정합니다.
-    set_seed(training_args.seed)
-
-    datasets = load_from_disk(data_args.test_dataset_name)
-    print(datasets)
-
+def main(args, model_args, training_args, data_args, datasets):
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
@@ -361,7 +322,7 @@ def run_mrc(
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics
     )
 
     logger.info("*** Evaluate ***")
@@ -385,5 +346,72 @@ def run_mrc(
         trainer.save_metrics("test", metrics)
 
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True, help="config 폴더에 있는 json 파일을 로드하세요", default="./config/reader/base_config.json")
+    parser.add_argument("--pred_dir", help="Prediction 폴더 설정", default="./predictions")
+    parser.add_argument("--do_predict", action="store_true", required=True, help="Predict할 경우 활성화")
+    parser.add_argument("--do_eval", action="store_true", help="Eval도 같이 할 경우에 활성화")
+    parser.add_argument("--do_valid", action="store_true", help="Validation 데이터셋에 대해 Prediction을 저장하기 위한 옵션")
+    args = parser.parse_args()
+
+    model_args, data_args, training_args = json_to_Arguments(args.config)
+    
+    training_args = TrainingArguments(**training_args)
+    training_args.output_dir = os.path.join(args.pred_dir,"predict")
+    if args.do_predict:
+        training_args.do_predict = True
+
+    if args.do_eval:
+        training_args.do_eval = True
+    
+    # Test Dataset 대해서 Predictions 수행
+    print(f"model is from {model_args.model_name_or_path}")
+    print(f"data is from {data_args.test_dataset_name}")
+
+    # logging 설정
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+    # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
+    logger.info("Training/evaluation parameters %s", training_args)
+
+    # 모델을 초기화하기 전에 난수를 고정합니다.
+    set_seed(training_args.seed)
+
+    datasets = load_from_disk(data_args.test_dataset_name)
+    print(datasets)
+    print("******* predict dataset Predictions *******")
+    main(args, model_args, training_args, data_args, datasets)
+
+    if args.do_valid:
+
+        # Validation Dataset 대해서도 Predictions 수행
+        training_args.output_dir = os.path.join(args.pred_dir,"validation")
+
+        # logging 설정
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+            datefmt="%m/%d/%Y %H:%M:%S",
+            handlers=[logging.StreamHandler(sys.stdout)],
+        )
+        # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
+        logger.info("Training/evaluation parameters %s", training_args)
+
+        # 모델을 초기화하기 전에 난수를 고정합니다.
+        set_seed(training_args.seed)
+
+        datasets = load_from_disk(data_args.train_dataset_name)
+        answers = {data["id"]:data["answers"]["text"][0] for data in datasets["validation"]}
+        datasets = datasets.remove_columns(["title","context","answers","document_id","__index_level_0__"])
+        print("******* validation dataset Predictions *******")
+        print(datasets)
+        main(args, model_args, training_args, data_args, datasets)
+
+        # 기존 predictions 불러와서 정답 추가
+        dict_to_json(os.path.join(training_args.output_dir,"predictions.json"),
+                     os.path.join(training_args.output_dir,"prediction_with_ans.json"),
+                     answers)
