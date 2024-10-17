@@ -12,7 +12,6 @@ from typing import Callable, Dict, List, NoReturn, Tuple
 import argparse
 
 import numpy as np
-from arguments import DataTrainingArguments, ModelArguments
 from datasets import (
     Dataset,
     DatasetDict,
@@ -39,7 +38,7 @@ from transformers import (
 )
 
 
-from utils.utils_qa import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
 from utils.utils_common import dict_to_json
 
 logger = logging.getLogger(__name__)
@@ -137,12 +136,11 @@ def run_dense_retrieval(
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
     
-
 def run_sparse_retrieval( # 
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
     training_args: TrainingArguments,
-    data_args: DataTrainingArguments,
+    data_args,
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
@@ -191,11 +189,11 @@ def run_sparse_retrieval( #
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
-# 현재는 Extraction-MRC, Dense Passage 방식 테스트를 위함
+# 현재는 Extraction-MRC, Dense Passage 방식 테스트
 def run_mrc(
-    data_args: DataTrainingArguments,
+    data_args,
     training_args: TrainingArguments,
-    model_args: ModelArguments,
+    model_args,
     datasets: DatasetDict,
     tokenizer,
     model,

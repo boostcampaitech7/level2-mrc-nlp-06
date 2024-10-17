@@ -26,7 +26,7 @@ from transformers import (
 )
 import nltk
 
-from utils.utils_qa import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
 from custom_datasets.preprocessing import get_train_dataset
 
 
@@ -104,8 +104,12 @@ def main():
         type(model),
     )    
     if not model_args.generation:
+        print("***** Train Extractive QA *****")
+        training_args.output_dir=str(os.path.join(training_args.output_dir,"Extractive"))
         run_mrc_extract(data_args, training_args, model_args, datasets, tokenizer, model)
     else:
+        print("***** Train Abstractive QA *****")
+        training_args.output_dir=str(os.path.join(training_args.output_dir,"Abstractive"))
         run_mrc_generation(data_args, training_args, model_args, datasets, tokenizer, model)
 
 def run_mrc_generation(
@@ -115,7 +119,8 @@ def run_mrc_generation(
     datasets: DatasetDict,
     tokenizer,
     model,) -> NoReturn:
-
+    
+    
     if training_args.do_train:
         column_names = datasets["train"].column_names
     else:
@@ -160,44 +165,43 @@ def run_mrc_generation(
             tokenizer,
             model=model,
         )
-    
-    def postprocess_text(preds, labels):
-        preds = [pred.strip() for pred in preds]
-        labels = [label.strip() for label in labels]
 
-        preds = ["\n".join(nltk.sent_tokenize(pred)) for pred in preds]
-        labels = ["\n".join(nltk.sent_tokenize(label)) for label in labels]
+    def post_process_function(examples, predictions):
+        """
+        examples: 원본
+        features: 전처리된 데이터셋
+        predictions: 모델 예측 결과
+        """
+        # 1. 예측한 prediction token Decoding
+        decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        # label은 따로 구하지 않음 (Rouge metric 용도)
+        # labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        # decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-        return preds, labels
-    
+        # 2. 공백 제거, 문장 단위 분리
+        decoded_preds = [pred.strip() for pred in decoded_preds]
+        decoded_preds = ["\n".join(nltk.sent_tokenize(pred)) for pred in decoded_preds]
+
+        # 3. Format 맞춰주기
+        formatted_predictions = [{"id": ex["id"], "prediction_text": decoded_preds[i]} for i, ex in enumerate(examples)]
+        references = [{"id": ex["id"], "answers": ex["answers"]} for ex in examples]
+        
+        # 4. 후처리 결과 작업 저장
+
+        return formatted_predictions, references
+
     metric = load_metric("squad")
-
     def compute_metrics(eval_preds):
-        preds, labels = eval_preds
-        if isinstance(preds, tuple):
-            preds = preds[0]
-
-        preds = np.where(preds != -100, preds, tokenizer.pad_token_id)
-        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-        # decoded_labels is for rouge metric, not used for f1/em metric
-
-        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-        # Some simple post-processing
-        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-        formatted_predictions = [{"id": ex['id'], "prediction_text": decoded_preds[i]} for i, ex in enumerate(datasets["validation"])]
-        references = [{"id": ex["id"], "answers": ex["answers"]} for ex in datasets["validation"]]
-
+        predictions, labels = eval_preds
+        formatted_predictions, references = post_process_function(datasets["validation"], predictions)
         result = metric.compute(predictions=formatted_predictions, references=references)
         return result
     
-    # 추후에 trainer_mrc_gen.py로 Custom Trainer 만들기
+    # 추후에 trainer_mrc_gen.py로 Custom Trainer 만들기 --> 실패함
     args = Seq2SeqTrainingArguments(
-        output_dir='outputs',
-        do_train=True,
-        do_eval=True,
+        output_dir=training_args.output_dir,
+        do_train=training_args.do_train,
+        do_eval=training_args.do_eval,
         predict_with_generate=True,
         per_device_train_batch_size=training_args.train_batch_size,
         per_device_eval_batch_size=training_args.eval_batch_size,
@@ -209,11 +213,11 @@ def run_mrc_generation(
     trainer = Seq2SeqTrainer(
         model=model,
         args=args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics
     )
 
     # Training
@@ -251,8 +255,7 @@ def run_mrc_generation(
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate(max_length=128,
-                                   num_beams=3,
-                                   metric_key_prefix="eval")
+                                   num_beams=3)
 
         metrics["eval_samples"] = len(eval_dataset)
 

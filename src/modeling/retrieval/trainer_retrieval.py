@@ -238,6 +238,4 @@ class DenseRetrieval():
 
         # new_df.to_csv(os.path.join(model_path, 'new_context.csv'))
 
-        return new_df 
-
         return new_df

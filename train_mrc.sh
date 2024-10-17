@@ -1,4 +1,4 @@
-config_name="./config/reader/base_config.json"
+config_name="./config/reader/base_gen_config.json"
 
 # 기본값 설정
 DO_EVAL=false
