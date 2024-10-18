@@ -27,8 +27,6 @@ from transformers import (
 import nltk
 
 from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
-from custom_datasets.preprocessing import get_train_dataset
-
 
 seed = 2024
 deterministic = False
@@ -82,18 +80,11 @@ def main():
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    if not model_args.generation:
-        model = AutoModelForQuestionAnswering.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-        )
-    elif model_args.generation:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config
-        )
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        model_args.model_name_or_path,
+        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        config=config
+    )
 
 
     print(
@@ -103,14 +94,9 @@ def main():
         type(tokenizer),
         type(model),
     )    
-    if not model_args.generation:
-        print("***** Train Extractive QA *****")
-        training_args.output_dir=str(os.path.join(training_args.output_dir,"Extractive"))
-        run_mrc_extract(data_args, training_args, model_args, datasets, tokenizer, model)
-    else:
-        print("***** Train Abstractive QA *****")
-        training_args.output_dir=str(os.path.join(training_args.output_dir,"Abstractive"))
-        run_mrc_generation(data_args, training_args, model_args, datasets, tokenizer, model)
+    print("***** Train Abstractive QA *****")
+    training_args.output_dir=str(os.path.join(training_args.output_dir,"Abstractive"))
+    run_mrc_generation(data_args, training_args, model_args, datasets, tokenizer, model)
 
 def run_mrc_generation(
     data_args: dict,
@@ -197,7 +183,6 @@ def run_mrc_generation(
         result = metric.compute(predictions=formatted_predictions, references=references)
         return result
     
-    # 추후에 trainer_mrc_gen.py로 Custom Trainer 만들기 --> 실패함
     args = Seq2SeqTrainingArguments(
         output_dir=training_args.output_dir,
         do_train=training_args.do_train,
@@ -256,132 +241,6 @@ def run_mrc_generation(
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate(max_length=128,
                                    num_beams=3)
-
-        metrics["eval_samples"] = len(eval_dataset)
-
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
-
-
-def run_mrc_extract(
-    data_args: dict,
-    training_args: TrainingArguments,
-    model_args: dict,
-    datasets: DatasetDict,
-    tokenizer,
-    model,) -> NoReturn:
-
-    # dataset을 전처리합니다.
-    # training과 evaluation에서 사용되는 전처리는 아주 조금 다른 형태를 가집니다.
-    if training_args.do_train:
-        column_names = datasets["train"].column_names
-    else:
-        column_names = datasets["validation"].column_names
-
-    question_column_name = "question" if "question" in column_names else column_names[0]
-    context_column_name = "context" if "context" in column_names else column_names[1]
-    answer_column_name = "answers" if "answers" in column_names else column_names[2]
-    qca_names = [question_column_name, context_column_name, answer_column_name]
-
-    # Padding에 대한 옵션을 설정합니다.
-    # (question|context) 혹은 (context|question)로 세팅 가능합니다.
-    pad_on_right = tokenizer.padding_side == "right"
-
-    # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(data_args, training_args, datasets, tokenizer)
-    
-    if training_args.do_train:
-        if training_args.do_eval:
-            train_dataset, eval_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
-                                                            column_names,qca_names,pad_on_right)
-        else:
-            train_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
-                                                            column_names,qca_names,pad_on_right)
-
-    data_collator = DataCollatorWithPadding(
-        tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
-    )
-
-    # Post-processing:
-    def post_processing_function(examples, features, predictions, training_args):
-        # Post-processing: start logits과 end logits을 original context의 정답과 match시킵니다.
-        predictions = postprocess_qa_predictions(
-            examples=examples,
-            features=features,
-            predictions=predictions,
-            max_answer_length=data_args.max_answer_length,
-            output_dir=training_args.output_dir,
-        )
-        # Metric을 구할 수 있도록 Format을 맞춰줍니다.
-        formatted_predictions = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
-        ]
-        if training_args.do_predict:
-            return formatted_predictions
-
-        elif training_args.do_eval:
-            references = [
-                {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in datasets["validation"]
-            ]
-            return EvalPrediction(
-                predictions=formatted_predictions, label_ids=references
-            )
-
-    # Set metric
-    metric = load_metric("squad")
-
-    def compute_metrics(p: EvalPrediction):
-        return metric.compute(predictions=p.predictions, references=p.label_ids)
-
-    # Trainer 초기화
-    trainer = QuestionAnsweringTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        eval_examples=datasets["validation"] if training_args.do_eval else None,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        post_process_function=post_processing_function,
-        compute_metrics=compute_metrics,
-    )
-
-    # Training
-    if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif os.path.isdir(model_args.model_name_or_path):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
-
-        metrics = train_result.metrics
-        metrics["train_samples"] = len(train_dataset)
-
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
-
-        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
-
-        with open(output_train_file, "w") as writer:
-            logger.info("***** Train results *****")
-            for key, value in sorted(train_result.metrics.items()):
-                logger.info(f"  {key} = {value}")
-                writer.write(f"{key} = {value}\n")
-
-        # State 저장
-        trainer.state.save_to_json(
-            os.path.join(training_args.output_dir, "trainer_state.json")
-        )
-
-    # Evaluation
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        metrics = trainer.evaluate()
 
         metrics["eval_samples"] = len(eval_dataset)
 

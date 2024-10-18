@@ -23,4 +23,10 @@ def dict_to_json(json_path, save_path, answer):
     with open(save_path,"w", encoding="utf-8") as f:
         json.dump(formated_data, f, ensure_ascii=False, indent=4)
 
+def json_to_config(json_file):
     
+    with open(json_file, "r") as f:
+        args_dicts = json.load(f)
+    args_box = Box(args_dicts)
+
+    return args_box
