@@ -1,0 +1,36 @@
+10/14/2024 13:35:19 - INFO - __main__ -    Starting Sparse Retrieval System.
+10/14/2024 13:35:19 - INFO - __main__ -    Loading tokenizer model: klue/bert-base
+10/14/2024 13:35:19 - INFO - __main__ -    Embedding method: tfidf
+10/14/2024 13:35:19 - INFO - __main__ -    Top-K: 55
+10/14/2024 13:35:19 - INFO - __main__ -    Evaluation method: ['hit', 'mrr']
+10/14/2024 13:35:19 - INFO - __main__ -    Loading data.
+10/14/2024 13:35:19 - INFO - __main__ -    Loading Wikipedia data from ../../data/wikipedia_documents.json
+10/14/2024 13:35:19 - INFO - __main__ -    File size of ../../data/wikipedia_documents.json: 110.0 MB
+10/14/2024 13:35:21 - INFO - __main__ -    Length of unique context: 56737
+10/14/2024 13:35:21 - INFO - __main__ -    [Load data] done in 1.659 s
+10/14/2024 13:35:21 - INFO - __main__ -    Generating sparse embeddings.
+10/14/2024 13:35:21 - INFO - __main__ -    Loading TF-IDF pickle files.
+10/14/2024 13:35:21 - INFO - __main__ -    File size of tfidf.bin: 40.7 MB
+10/14/2024 13:35:21 - INFO - __main__ -    File size of tfidf_sparse_embedding.bin: 217.1 MB
+10/14/2024 13:35:23 - INFO - __main__ -    [Generate sparse embeddings] done in 1.962 s
+10/14/2024 13:35:23 - INFO - __main__ -    Evaluating retrieval performance.
+10/14/2024 13:35:23 - INFO - __main__ -    Loading evaluation dataset from ../../data/train_dataset
+10/14/2024 13:35:23 - INFO - __main__ -    Evaluation dataset loaded with 4192 examples.
+10/14/2024 13:35:23 - INFO - __main__ -    Retrieving for dataset queries.
+10/14/2024 13:35:49 - INFO - __main__ -    [query exhaustive search] done in 26.418 s
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  20%|█▉        | 837/4192 [00:00<00:00, 8368.29it/s]Sparse retrieval:  42%|████▏     | 1764/4192 [00:00<00:00, 8897.76it/s]Sparse retrieval:  64%|██████▍   | 2681/4192 [00:00<00:00, 9018.19it/s]Sparse retrieval:  86%|████████▋ | 3621/4192 [00:00<00:00, 9166.47it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 5217.17it/s]
+10/14/2024 13:35:50 - INFO - __main__ -    Completed retrieval for dataset queries.
+10/14/2024 13:35:50 - INFO - __main__ -    Evaluating Hit@k.
+10/14/2024 13:35:50 - INFO - __main__ -    Hit@55: 0.8280
+10/14/2024 13:35:50 - INFO - __main__ -    [Evaluation hit] done in 27.263 s
+10/14/2024 13:35:50 - INFO - __main__ -    Loading evaluation dataset from ../../data/train_dataset
+10/14/2024 13:35:50 - INFO - __main__ -    Evaluation dataset loaded with 4192 examples.
+10/14/2024 13:35:50 - INFO - __main__ -    Retrieving for dataset queries.
+10/14/2024 13:36:17 - INFO - __main__ -    [query exhaustive search] done in 26.397 s
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  21%|██▏       | 895/4192 [00:00<00:00, 8941.82it/s]Sparse retrieval:  43%|████▎     | 1797/4192 [00:00<00:00, 8983.33it/s]Sparse retrieval:  65%|██████▌   | 2737/4192 [00:00<00:00, 9172.43it/s]Sparse retrieval:  87%|████████▋ | 3660/4192 [00:00<00:00, 9193.11it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 9175.34it/s]
+10/14/2024 13:36:17 - INFO - __main__ -    Completed retrieval for dataset queries.
+10/14/2024 13:36:17 - INFO - __main__ -    Evaluating MRR@k.
+10/14/2024 13:36:17 - INFO - __main__ -    MRR@55: 0.3826
+10/14/2024 13:36:17 - INFO - __main__ -    [Evaluation mrr] done in 26.907 s
+10/14/2024 13:36:17 - INFO - __main__ -    Total execution time: 57.793 s
+10/14/2024 13:36:17 - INFO - __main__ -    Sparse Retrieval System finished execution.
