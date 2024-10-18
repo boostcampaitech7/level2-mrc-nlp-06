@@ -43,14 +43,24 @@ def main():
     wiki_df = pd.DataFrame(wiki.values())
     wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
+    contexts = contexts[:10]  # 테스트용 코드
 
     # Initialize tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_model_name, use_fast=True)
-    retriever = SparseRetrieval(
-        embedding_method=args.embedding_method,  # 'tfidf','bm25'
-        tokenizer=tokenizer,
-        contexts=contexts,
-    )
+    if args.embedding_method in ['tfidf','bm25']:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_model_name, use_fast=True)
+        retriever = SparseRetrieval(
+            embedding_method=args.embedding_method,  # 'tfidf','bm25'
+            contexts=contexts,
+            tokenizer=tokenizer,
+        )
+    elif args.embedding_method == "bge-m3":
+        retriever = SparseRetrieval(
+            embedding_method=args.embedding_method,  # 'tfidf','bm25'
+            contexts=contexts,
+            aggregation_method=args.aggregation_method,
+            similarity_metric=args.similarity_metric,
+            embedding_model_name=args.embedding_model_name
+        )
 
     # Generate embeddings
     logger.info("Generating sparse embeddings.")
@@ -59,12 +69,15 @@ def main():
             retriever.get_sparse_embedding_tfidf()
         elif args.embedding_method == "bm25":
             retriever.get_sparse_embedding_bm25()
+        elif args.embedding_method == "bge-m3":
+            retriever.get_sparse_embedding_learned()
 
     # Evaluate
     logger.info("Evaluating retrieval performance.")
     evaluation_results = {}
     for eval_method in args.eval_metric:
         with timer(f"Evaluation {eval_method}"):
+            print("evaluation_start")
             result = retriever.evaluate(
                 eval_data_path=args.eval_data_path,
                 topk=args.topk,
@@ -78,8 +91,14 @@ def main():
     logger.info(f"Total execution time: {total_time:.3f} s")
 
     # Append to CSV
+    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    # config 디렉토리를 'retrieval' 디렉토리 안의 'config' 폴더로 설정
+    output_file_name = f"sparse_test_{args.embedding_method}.csv"
+    full_config_path = os.path.join(output_dir, 'outputs', output_file_name)
+    
     append_to_csv(
-        f"../outputs/sparse_embedding_test_{args.embedding_method}.csv",
+        full_config_path,
         args,
         total_time,
         evaluation_results,

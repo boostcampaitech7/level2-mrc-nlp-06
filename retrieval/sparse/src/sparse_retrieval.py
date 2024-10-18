@@ -3,6 +3,7 @@ import sys
 import os
 import pickle
 from typing import List, NoReturn, Optional, Tuple, Union
+# from scipy import sparse
 
 import numpy as np
 import pandas as pd
@@ -10,10 +11,13 @@ from datasets import Dataset, concatenate_datasets, load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from rank_bm25 import BM25Okapi
 from tqdm.auto import tqdm
+import torch
+from torch.utils.data import DataLoader
+from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 # 2단계 상위 경로를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.utils_sparse_retrieval import timer, hit, mrr
+from utils.utils_sparse_retrieval import timer, hit, mrr, pooling_fn
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -25,20 +29,43 @@ logger = logging.getLogger(__name__)
 
 
 class SparseRetrieval:
-    def __init__(self, embedding_method: str, tokenizer, contexts) -> NoReturn:
+    def __init__(self, embedding_method, contexts, 
+                 tokenizer=None,
+                 aggregation_method: Optional[str]=None, 
+                 similarity_metric: Optional[str]=None,
+                 embedding_model_name: Optional[str]=None) -> NoReturn:
 
         self.embedding_method = embedding_method
-        self.tokenize_fn = tokenizer.tokenize
         self.contexts = contexts
-        self.tfidfv = None
-        self.p_embedding = None
-        self.bm25 = None
+
+        # 전통적인 sparse embedding (TF-IDF, BM25)
+        if self.embedding_method in ["tfidf", "bm25"]:
+            self.tokenize_fn = tokenizer.tokenize
+            self.tfidfv = None
+            self.p_embedding = None
+            self.bm25 = None
+        
+        # Learned sparse embedding (BGE-M3)
+        elif self.embedding_method == 'bge-m3':
+            self.embedding_model_name = embedding_model_name
+            self.aggregation_method = aggregation_method  # 'sum', 'max'
+            self.similarity_metric = similarity_metric    # 'cosine', 'dot_product'
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.encoder = AutoModelForMaskedLM.from_pretrained(self.embedding_model_name)
+            self.encoder.eval()
+            self.encoder.to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.embedding_model_name)
+            self.p_embedding_norm = None  # For cosine similarity
+
+
 
     def get_sparse_embedding_tfidf(self) -> NoReturn:
+        os.makedirs("../model", exist_ok=True)
         pickle_name = f"{self.embedding_method}_sparse_embedding.bin"
         vectorizer_name = f"{self.embedding_method}.bin"
         emb_path = os.path.join("../model", pickle_name)
         vectorizer_path = os.path.join("../model", vectorizer_name)
+
 
         if os.path.isfile(vectorizer_path) and os.path.isfile(emb_path):
             logger.info("Loading TF-IDF pickle files.")
@@ -63,6 +90,7 @@ class SparseRetrieval:
             logger.info("Embedding pickle saved.")
 
     def get_sparse_embedding_bm25(self) -> NoReturn:
+        os.makedirs("../model", exist_ok=True)
         vectorizer_name = f"{self.embedding_method}.bin"
         vectorizer_path = os.path.join("../model", vectorizer_name)
 
@@ -83,20 +111,69 @@ class SparseRetrieval:
                 pickle.dump(self.bm25, file)
             logger.info("BM25 model saved.")
 
+
+    def get_sparse_embedding_learned(self, batch_size: int = 8) -> NoReturn:
+        os.makedirs("../model", exist_ok=True)
+        pickle_name = f"{self.embedding_method}_sparse_embedding.bin"
+        emb_path = os.path.join("../model", pickle_name)
+        
+        if os.path.isfile(emb_path): 
+            logger.info("Loading embedding pickle file.")
+            with open(emb_path, "rb") as file:
+                self.p_embedding = pickle.load(file)
+            logger.info("Loading is done")
+        else:
+            logger.info(f"Generating embeddings using {self.embedding_method} model.")
+            dataloader = DataLoader(self.contexts, batch_size=batch_size)
+            current_batch_embeddings = []
+
+            with timer("BGE-M3 Embedding Generation"):
+                for batch in tqdm(dataloader, desc="Generating Passage Embeddings"):
+                    encoded_input = self.tokenizer(batch, padding=True, truncation=True, return_tensors="pt").to(self.device)
+                    with torch.no_grad():
+                        model_output = self.encoder(**encoded_input)
+                        values = pooling_fn(encoded_input, model_output, self.aggregation_method)
+                        batch_embedding = values.squeeze().cpu().numpy().astype(np.float16)
+                        current_batch_embeddings.append(batch_embedding)
+                    # GPU 캐시 삭제
+                    del encoded_input, model_output, values, batch_embedding
+                    torch.cuda.empty_cache()
+                self.p_embedding = np.vstack(current_batch_embeddings)
+
+            logger.info("Saving BGE-M3 pickle file.")
+            with open(emb_path, "wb") as file:
+                pickle.dump(self.p_embedding, file)
+            logger.info("BGE-M3 model saved.")
+
+        if self.similarity_metric == "cosine":
+            print("normaliztion start")
+            eps = 1e-9
+
+            # Normalize embeddings batch by batch
+            normalization_batch_size = 1000
+            total_embeddings = self.p_embedding.shape[0]
+            for start_idx in tqdm(range(0, total_embeddings, normalization_batch_size), desc="Normalizing embeddings"):
+                end_idx = min(start_idx + normalization_batch_size, total_embeddings)
+                batch_embeddings = self.p_embedding[start_idx:end_idx]
+                norms = (np.linalg.norm(batch_embeddings, axis=1, keepdims=True) + eps)
+                self.p_embedding[start_idx:end_idx] = batch_embeddings / norms
+
+            # p_embedding_norm = (np.linalg.norm(self.p_embedding, axis=1, keepdims=True) + eps)
+            # self.p_embedding = self.p_embedding / p_embedding_norm
+            logger.info("Normalization finished.")
+
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List, List], pd.DataFrame]:
 
-        if self.embedding_method == "tfidf":
+        if self.embedding_method in ["tfidf", "bge-m3"]:
             assert (
                 self.p_embedding is not None
             ), "get_sparse_embedding() 메소드를 먼저 수행해주세요."
-            logger.debug("Using TF-IDF for retrieval.")
         elif self.embedding_method == "bm25":
             assert (
                 self.bm25 is not None
             ), "get_sparse_embedding() 메소드를 먼저 수행해주세요."
-            logger.debug("Using BM25 for retrieval.")
 
         if isinstance(query_or_dataset, str):
             logger.info("Retrieving for single query.")
@@ -106,6 +183,10 @@ class SparseRetrieval:
                 )
             elif self.embedding_method == "bm25":
                 doc_scores, doc_indices = self.get_relevant_doc_bm25(
+                    query_or_dataset, k=topk
+                )
+            elif self.embedding_method == "bge-m3":
+                doc_scores, doc_indices = self.get_relevant_doc_learned(
                     query_or_dataset, k=topk
                 )
             logger.info(f"[Search query]\n{query_or_dataset}\n")
@@ -128,6 +209,10 @@ class SparseRetrieval:
                     )
                 elif self.embedding_method == "bm25":
                     doc_scores, doc_indices = self.get_relevant_doc_bulk_bm25(
+                        queries, k=topk
+                    )
+                elif self.embedding_method == "bge-m3":
+                    doc_scores, doc_indices = self.get_relevant_doc_bulk_learned(
                         queries, k=topk
                     )
 
@@ -266,6 +351,83 @@ class SparseRetrieval:
 
         return doc_scores, doc_indices
 
+
+    def get_relevant_doc_learned(
+        self, query: str, k: Optional[int] = 1
+    ) -> Tuple[List, List]:
+        
+        query_vec = self.tokenizer([query], padding=True, truncation=True, return_tensors="pt").to(self.device)
+        if query_vec.nnz == 0:
+            logger.warning("Query contains only unknown words.")
+            raise ValueError(
+                "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
+            )
+        
+        with torch.no_grad(): 
+            model_output = self.encoder(**query_vec)
+            values = pooling_fn(query_vec, model_output, self.aggregation_method)
+
+            # normalization for cosine similarity
+            if self.similarity_metric == "cosine":
+                eps = 1e-9
+                values = values / (torch.norm(values, dim=-1, keepdim=True) + eps)
+
+            q_embedding = values.squeeze().cpu().numpy().astype(np.float16)
+
+        # 연관 문서 찾기
+        similarity_scores = np.dot(q_embedding, self.p_embedding.T)
+        if not isinstance(similarity_scores, np.ndarray):
+            similarity_scores = similarity_scores.toarray()
+
+        sorted_result = np.argsort(similarity_scores.squeeze())[::-1]
+        doc_score = similarity_scores.squeeze()[sorted_result].tolist()[:k]
+        doc_indices = sorted_result.tolist()[:k]
+        return doc_score, doc_indices
+
+
+    def get_relevant_doc_bulk_learned(self, queries: List, k: Optional[int] = 1) -> Tuple[List, List]:
+
+        all_embeddings = []
+        batch_size = 64
+        dataloader = DataLoader(queries, batch_size=batch_size)
+
+        for batch in tqdm(dataloader, desc="Processing Query Batches"):
+            query_vecs = self.tokenizer(
+                batch, padding=True, truncation=True, return_tensors="pt"
+            ).to(self.device)
+
+            with torch.no_grad(): 
+                model_output = self.encoder(**query_vecs)
+                values = pooling_fn(query_vecs, model_output, self.aggregation_method)
+
+                # normalization for cosine similarity
+                if self.similarity_metric == "cosine":
+                    eps = 1e-9
+                    values = values / (torch.norm(values, dim=-1, keepdim=True) + eps)
+
+                batch_q_embedding = values.squeeze().cpu().numpy() # .astype(np.float16)
+                all_embeddings.append(batch_q_embedding)
+            # 불필요한 캐시 삭제
+            del query_vecs, model_output, values, batch_q_embedding
+            torch.cuda.empty_cache()
+
+        q_embedding = np.vstack(all_embeddings).astype(np.float16)
+
+        # 연관 문서 찾기
+        similarity_scores = q_embedding.dot(self.p_embedding.T)
+        if not isinstance(similarity_scores, np.ndarray):
+            similarity_scores = similarity_scores.toarray()
+
+        doc_scores = []
+        doc_indices = []
+
+        for i in range(similarity_scores.shape[0]):
+            sorted_result = np.argsort(similarity_scores[i, :])[::-1]
+            doc_scores.append(similarity_scores[i, :][sorted_result].tolist()[:k])
+            doc_indices.append(sorted_result.tolist()[:k])
+        return doc_scores, doc_indices
+
+
     def evaluate(
         self,
         eval_data_path,
@@ -280,6 +442,7 @@ class SparseRetrieval:
                 org_dataset["validation"].flatten_indices(),
             ]
         )
+        eval_df = eval_df
         logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
 
         result_df = self.retrieve(eval_df, topk=topk)

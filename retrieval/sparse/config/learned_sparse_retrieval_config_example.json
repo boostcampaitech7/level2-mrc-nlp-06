@@ -1,0 +1,11 @@
+{
+    "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
+    "embedding_method": "bge-m3",
+    "topk": 10,
+    "tokenizer_model_name": "",
+    "embedding_model_name": "upskyy/bge-m3-korean",
+    "aggregation_method": "sum",
+    "similarity_metric": "cosine",
+    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1/train_dataset",
+    "eval_metric": ["hit", "mrr"]
+}

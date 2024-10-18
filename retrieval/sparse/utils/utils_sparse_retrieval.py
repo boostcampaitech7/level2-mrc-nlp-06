@@ -4,6 +4,7 @@ import json
 from box import Box
 import os
 import csv
+import torch
 
 
 @contextmanager
@@ -17,12 +18,33 @@ def timer(name):
 
 
 def load_config(config_path: str):
-    full_config_path = "../config/" + config_path + ".json"
+    # 현재 파일 위치를 기준으로 'retrieval' 디렉토리를 기준 경로로 설정
+    retrieval_base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    # config 디렉토리를 'retrieval' 디렉토리 안의 'config' 폴더로 설정
+    full_config_path = os.path.join(retrieval_base_dir, 'config', config_path + ".json")
+    
+    # Config 파일 로드
     with open(full_config_path, "r") as f:
         config = json.load(f)
         config = Box(config)
+    
     return config
 
+# learned sparse embedding pooling 함수
+def pooling_fn(encoded_input, model_output, aggregation_method):
+    attention_mask = encoded_input["attention_mask"]
+    logits = model_output.logits
+    relu_log = torch.log(1 + torch.relu(logits))
+    weighted_log = relu_log * attention_mask.unsqueeze(-1)
+
+    if aggregation_method == 'sum':
+        values = torch.sum(weighted_log, dim=1)
+    elif aggregation_method == 'max':
+        values, _ = torch.max(weighted_log, dim=1)
+    else:
+        raise ValueError(f"Unsupported aggregation method: {aggregation_method}")
+    return values
 
 # retrieval 평가 점수
 def hit(df):
