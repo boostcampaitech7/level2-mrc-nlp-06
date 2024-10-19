@@ -1,0 +1,13 @@
+{
+    "encoder_type": "cr-encoder",
+    "data_path": "../../../data",
+    "task": "train",
+    "model": {
+        "name": "../../../sbert-cross-encoder",
+        "epochs": 5,
+        "batch_size": 32,
+        "weight_decay": 0.01,
+        "data_type": "valid",
+        "topk": 5
+    }
+}

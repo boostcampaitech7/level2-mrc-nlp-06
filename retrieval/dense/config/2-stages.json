@@ -1,0 +1,13 @@
+{
+    "encoder_type": "2-stages",
+    "data_path": "../../../data",
+    "data_type": "valid",
+    "bi-encoder": {
+        "model": "../../../sbert-bi-encoder/checkpoint-620",
+        "topk": 100
+    },
+    "cr-encoder": {
+        "model": "../../../sbert-cross-encoder",
+        "topk": 10
+    }
+}
