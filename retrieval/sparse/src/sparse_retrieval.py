@@ -35,10 +35,11 @@ class SparseRetrieval:
         self.bm25 = None
 
     def get_sparse_embedding_tfidf(self) -> NoReturn:
+        sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         pickle_name = f"{self.embedding_method}_sparse_embedding.bin"
         vectorizer_name = f"{self.embedding_method}.bin"
-        emb_path = os.path.join("../model", pickle_name)
-        vectorizer_path = os.path.join("../model", vectorizer_name)
+        emb_path = os.path.join(sparse_path_name, "model", pickle_name)
+        vectorizer_path = os.path.join(sparse_path_name, "model", vectorizer_name)
 
         if os.path.isfile(vectorizer_path) and os.path.isfile(emb_path):
             logger.info("Loading TF-IDF pickle files.")
@@ -63,8 +64,9 @@ class SparseRetrieval:
             logger.info("Embedding pickle saved.")
 
     def get_sparse_embedding_bm25(self) -> NoReturn:
+        sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         vectorizer_name = f"{self.embedding_method}.bin"
-        vectorizer_path = os.path.join("../model", vectorizer_name)
+        vectorizer_path = os.path.join(sparse_path_name, "model", vectorizer_name)
 
         if os.path.isfile(vectorizer_path):  # bm25 does not use p_embedding
             logger.info("Loading BM25 pickle file.")
