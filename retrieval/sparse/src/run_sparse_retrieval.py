@@ -78,8 +78,9 @@ def main():
     logger.info(f"Total execution time: {total_time:.3f} s")
 
     # Append to CSV
+    sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     append_to_csv(
-        f"../outputs/sparse_embedding_test_{args.embedding_method}.csv",
+        f"{sparse_path_name}/outputs/sparse_embedding_test_{args.embedding_method}.csv",
         args,
         total_time,
         evaluation_results,
