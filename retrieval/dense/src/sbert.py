@@ -125,6 +125,7 @@ class BiEncoder():
             
             if save_path:
                 result_df.to_csv(os.path.join(save_path, 'bi-encoder-result.csv'))
+                
             return result_df
         elif stage == 2: # Bi-Encoder에서 retrieve한 결과를 re-ranking할 수 있도록 하는 형태
             return hits
@@ -217,7 +218,7 @@ class CrEncoder():
                 result_df.loc[i, 'context'] = ' '.join([d['text'] for d in r])
         
         if save_path:
-            result.to_csv(os.path.join(save_path, 'cr-encoder-result.csv'))
+            result_df.to_csv(os.path.join(save_path, 'cr-encoder-result.csv'))
 
         return result_df
 
@@ -249,7 +250,7 @@ class CrEncoder():
                 result_df.loc[i, 'context'] = ' '.join([d['text'] for d in r])
         
         if save_path:
-            result.to_csv(os.path.join(save_path, 'cr-encoder-result.csv'))
+            result_df.to_csv(os.path.join(save_path, '2-stages-result.csv'))
 
         return result_df
 
