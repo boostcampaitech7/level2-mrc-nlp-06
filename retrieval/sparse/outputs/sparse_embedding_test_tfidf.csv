@@ -1,0 +1,2 @@
+embedding_method,topk,total_time_sec,hit@k,mrr@k
+tfidf,10,63.311,0.6365,0.3730

@@ -1,0 +1,2 @@
+embedding_method,topk,total_time_sec,hit@k,mrr@k
+bm25,10,593.410,0.8724,0.6686
