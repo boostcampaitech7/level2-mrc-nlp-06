@@ -1,8 +1,11 @@
 {
     "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
-    "embedding_method": "tfidf",
+    "embedding_method": "bge-m3",
+    "bgem3_type": "sparse",
+    "dense_metric_type": "COSINE",
+    "embedding_model_name": "upskyy/bge-m3-korean",
+    "collection_name": "collection_bge_upskyy_sparse_cosine",
     "topk": 10,
-    "tokenizer_model_name": "klue/bert-base",
     "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1/train_dataset",
     "eval_metric": ["hit", "mrr"]
 }
