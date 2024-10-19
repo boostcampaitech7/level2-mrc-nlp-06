@@ -18,13 +18,8 @@ def timer(name):
 
 
 def load_config(config_path: str):
-    # 현재 파일 위치를 기준으로 'retrieval' 디렉토리를 기준 경로로 설정
-    retrieval_base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    
-    # config 디렉토리를 'retrieval' 디렉토리 안의 'config' 폴더로 설정
-    full_config_path = os.path.join(retrieval_base_dir, 'config', config_path + ".json")
-    
-    # Config 파일 로드
+    sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    full_config_path = sparse_path_name + "/config/" + config_path + ".json"
     with open(full_config_path, "r") as f:
         config = json.load(f)
         config = Box(config)

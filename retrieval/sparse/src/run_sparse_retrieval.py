@@ -91,14 +91,9 @@ def main():
     logger.info(f"Total execution time: {total_time:.3f} s")
 
     # Append to CSV
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    
-    # config 디렉토리를 'retrieval' 디렉토리 안의 'config' 폴더로 설정
-    output_file_name = f"sparse_test_{args.embedding_method}.csv"
-    full_config_path = os.path.join(output_dir, 'outputs', output_file_name)
-    
+    sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     append_to_csv(
-        full_config_path,
+        f"{sparse_path_name}/outputs/sparse_embedding_test_{args.embedding_method}.csv",
         args,
         total_time,
         evaluation_results,
