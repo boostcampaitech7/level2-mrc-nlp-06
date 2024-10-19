@@ -1,7 +1,6 @@
 {
     "qa_config":"",
     "retrieval_config":"",
-    
-    "test_dataset":"",
-    "valid_dataset":""
+    "output_dir":"",
+    "datasets":"/data/ephemeral/home/jh/data/datasets/v0.0.1"
 }

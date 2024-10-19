@@ -1,11 +1,21 @@
+# # ======= nested ======= #
 import logging
 import sys
 import os
 sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/ODQA')
 sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/reader')
 
-from reader.utils.utils_mrc import json_to_Arguments
+# ======= data processing ======= #
+import numpy as np
+import pandas as pd
+from typing import Callable, Dict, List, NoReturn, Tuple
 
+# ======= extractive model ======= #
+from reader.utils.utils_mrc import json_to_Arguments, postprocess_qa_predictions
+from reader.extractive.src.trainer_ext import QuestionAnsweringTrainer
+
+
+# ======= Hugging face ======= #
 from datasets import (
     Dataset,
     DatasetDict,
@@ -15,7 +25,6 @@ from datasets import (
     load_from_disk,
     load_metric,
 )
-
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -25,6 +34,7 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
+
 
 class ExtractiveQA():
     
@@ -43,6 +53,9 @@ class ExtractiveQA():
         self.model_args = config_args[0]
         self.data_args = config_args[1]
         self.training_args = config_args[2]
+
+    
+        self.logger = logging.getLogger(__name__)
 
     def load_model(self):
         
@@ -68,8 +81,10 @@ class ExtractiveQA():
         
         return model_args, data_args, training_args
     
-    def predict(self, datasets):
+    def predict(self, datasets, output_dir):
         # QA 모델의 경우 Retrieval의 결과가 필요함
+        # Datasets : Retrieval 결과에 대한 datasets
+
         # model inference 결과
         # eval 혹은 prediction에서만 사용함
         column_names = datasets["validation"].column_names
@@ -150,7 +165,7 @@ class ExtractiveQA():
                 examples=examples,
                 features=features,
                 predictions=predictions,
-                max_answer_length=data_args.max_answer_length,
+                max_answer_length=self.data_args.max_answer_length,
                 output_dir=training_args.output_dir,
             )
             # Metric을 구할 수 있도록 Format을 맞춰줍니다.
@@ -175,4 +190,37 @@ class ExtractiveQA():
         def compute_metrics(p: EvalPrediction) -> Dict:
             return metric.compute(predictions=p.predictions, references=p.label_ids)
 
-    def 
+        # Trainer 초기화
+        trainer = QuestionAnsweringTrainer(
+            model=self.model,
+            args=self.training_args,
+            train_dataset=None,
+            eval_dataset=eval_dataset,
+            eval_examples=datasets["validation"],
+            tokenizer=self.tokenizer,
+            data_collator=data_collator,
+            post_process_function=post_processing_function,
+            compute_metrics=compute_metrics
+        )
+
+        self.logger.info("*** Evaluate ***")
+
+        #### eval dataset & eval example - predictions.json 생성됨
+        if self.training_args.do_predict:
+            predictions = trainer.predict(
+                test_dataset=eval_dataset, test_examples=datasets["validation"]
+            )
+
+            # predictions.json 은 postprocess_qa_predictions() 호출시 이미 저장됩니다.
+            print(
+                "No metric can be presented because there is no correct answer given. Job done!"
+            )
+
+        if self.training_args.do_eval:
+            metrics = trainer.evaluate()
+            metrics["eval_samples"] = len(eval_dataset)
+
+            trainer.log_metrics("test", metrics)
+            trainer.save_metrics("test", metrics)
+        
+        return predictions

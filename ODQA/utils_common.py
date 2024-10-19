@@ -3,6 +3,14 @@ from box import Box
 import json
 import os
 
+from datasets import (
+    Dataset,
+    DatasetDict,
+    Features,
+    Sequence,
+    Value
+)
+
 def configurer(config_path):
     with open(config_path) as file:
         config = yaml.safe_load(file)
@@ -30,3 +38,16 @@ def json_to_config(json_file):
     args_box = Box(args_dicts)
 
     return args_box
+
+def df_to_dataset(df, do_predict):
+    if do_predict:
+        f = Features(
+            {
+                "context": Value(dtype="string", id=None),
+                "id": Value(dtype="string", id=None),
+                "question": Value(dtype="string", id=None),
+            }
+        )
+
+    datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
+    return datasets

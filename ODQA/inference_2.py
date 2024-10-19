@@ -7,10 +7,14 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 import logging
 import sys
 import os
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/src')
+import json
+sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/ODQA')
 from typing import Callable, Dict, List, NoReturn, Tuple
 import argparse
 import numpy as np
+import pandas as pd
+
+# ========= Hugging Face ========= #
 from datasets import (
     Dataset,
     DatasetDict,
@@ -20,7 +24,6 @@ from datasets import (
     load_from_disk,
     load_metric,
 )
-
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -33,7 +36,11 @@ from transformers import (
     set_seed,
 )
 
+# ========= Modules ========= #
+from modules.extractiveQA import ExtractiveQA
+from modules.spraseRetrieval import Sparse_Model
 from utils_common import json_to_config
+
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +72,7 @@ def main(args, model_args, training_args, data_args, datasets):
             config=config,
         )
 
-def run_odqa(args, inference_config, test_datasets, valid_datasets=None):
+def run_odqa(args, inference_config, test_datasets, wiki_path, valid_datasets=None):
     
     # Load QA Model
     match args.qa:
@@ -77,15 +84,32 @@ def run_odqa(args, inference_config, test_datasets, valid_datasets=None):
     # Load Retrieval Model
     match args.retrieval:
         case "sparse":
-            pass
+            Ret_model = Sparse_Model(args, inference_config, test_datasets, wiki_path, valid_datasets)
         case "dense":
             pass
         case "hybrid":
             pass
 
     # Inference
+    output_dir = os.path.join(inference_config.output_dir, "test") # predictions.json 출력폴더
+
+    # 1. Retrieval Model에서 Question에 맞는 Context를 가져옴
+    test_retrieve_datasets = Ret_model.get_contexts(test_datasets)
+
+    # 2. Reader에 Context를 전달하여 Inference를 수행
+    # Extraction Reader의 경우 postprocess_qa_predictions함수를 수행하면서 자동적으로 Json 저장
+    test_predictions = QA_model.predict(test_retrieve_datasets, output_dir)
+
+    # 3. 만약에 Validation도 추가로 Predictions을 뽑고 싶을 때
+    if valid_datasets is not None:
+        output_dir = os.path.join(inference_config.output_dir, "validation")
+        valid_retrieve_datasets = Ret_model.get_contexts(valid_datasets)
+        valid_predictions = QA_model.predict(valid_retrieve_datasets, output_dir)
+
     
-    
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -110,14 +134,19 @@ if __name__ == "__main__":
     )
 
     inference_config = json_to_config(args.config)
-    
+    test_path = os.path.join(inference_config.datasets,"test")
+    wiki_path = os.path.join(inference_config.datasets,"wiki.json")
+
     if args.do_valid:
-        test_datasets = load_from_disk(inference_config.test_dataset)
-        valid_datasets = load_from_disk(inference_config.valid_dataset)
-        run_odqa(inference_config, test_datasets, valid_datasets=valid_datasets)
+        valid_path = os.path(inference_config.datasets,"validation")
+        test_datasets = load_from_disk(test_path)
+        valid_datasets = load_from_disk(valid_path)
+        answers = {data["id"]:data["answers"]["text"][0] for data in valid_datasets["validation"]}
+        valid_datasets = valid_datasets.remove_columns(["title","context","answers","document_id","__index_level_0__"])
+        run_odqa(args, inference_config, test_datasets, wiki_path, valid_datasets=valid_datasets)
     else:
-        test_datasets = load_from_disk(inference_config.test_dataset)
-        run_odqa(args, inference_config, test_datasets)
+        test_datasets = load_from_disk(test_path)
+        run_odqa(args, inference_config, test_datasets, wiki_path)
     
     print("******* predict dataset Predictions *******")
 
