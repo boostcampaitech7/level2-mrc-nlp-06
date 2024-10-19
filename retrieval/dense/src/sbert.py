@@ -138,7 +138,7 @@ class BiEncoder():
         torch.save(doc_embs, os.path.join(save_path, 'embeddings.pt'))
 
 
-class CrossEncoder_():
+class CrEncoder():
     def __init__(self, data_path, model):
         self.data_path = data_path
         self.model = CrossEncoder(model, num_labels=1)
