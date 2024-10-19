@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch
 import argparse
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/src')
+sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/reader')
 
 
 from typing import NoReturn
@@ -21,8 +21,9 @@ from transformers import (
 )
 import nltk
 
-from reader.utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
-from reader.utils.preprocessing import get_train_dataset
+from extractive.src.trainer_ext import QuestionAnsweringTrainer
+from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from utils.preprocessing import get_train_dataset
 
 seed = 2024
 deterministic = False

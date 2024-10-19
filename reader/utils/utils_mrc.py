@@ -323,7 +323,7 @@ def postprocess_qa_predictions(
 
 
 def check_no_error(
-    data_args: DataTrainingArguments,
+    data_args,
     training_args: TrainingArguments,
     datasets: DatasetDict,
     tokenizer,
