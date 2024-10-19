@@ -17,7 +17,8 @@ def timer(name):
 
 
 def load_config(config_path: str):
-    full_config_path = "../config/" + config_path + ".json"
+    sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    full_config_path = sparse_path_name + "/config/" + config_path + ".json"
     with open(full_config_path, "r") as f:
         config = json.load(f)
         config = Box(config)
