@@ -82,13 +82,13 @@ def append_to_csv_learned(output_csv: str, args, total_time, evaluation_results)
         "bgem3_type": args.bgem3_type,
         "dense_metric_type": args.dense_metric_type,
         "embedding_model_name": args.embedding_model_name,
-        "collection_name":args.embedding_model_name,
+        "collection_name":args.collection_name,
         "topk": args.topk,
         "total_time_sec": f"{total_time:.3f}",
     }
     for eval_method, score in evaluation_results.items():
         row[f"{eval_method}@k"] = f"{score:.4f}"
-    headers = ["embedding_method", "topk", "total_time_sec"] + [
+    headers = ["embedding_method", "bgem3_type", "dense_metric_type", "embedding_model_name", "collection_name", "topk", "total_time_sec"] + [
         f"{method}@k" for method in args.eval_metric
     ]
 

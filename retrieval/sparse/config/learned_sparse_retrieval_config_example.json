@@ -1,10 +1,10 @@
 {
     "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
-    "embedding_method": "splade",
-    "bgem3_type": "sparse",
-    "dense_metric_type": "COSINE",
-    "embedding_model_name": "naver/splade-cocondenser-ensembledistil",
-    "collection_name": "collection_splade_naver",
+    "embedding_method": "bge-m3",
+    "bgem3_type": "dense",
+    "dense_metric_type": "IP",
+    "embedding_model_name": "upskyy/bge-m3-korean",
+    "collection_name": "collection_bge_upskyy_cosine",
     "topk": 10,
     "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1/train_dataset",
     "eval_metric": ["hit", "mrr"]

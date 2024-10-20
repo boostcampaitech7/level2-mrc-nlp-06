@@ -43,11 +43,12 @@ def main():
         wiki = json.load(f)
     wiki_df = pd.DataFrame(wiki.values())
     wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
-
+    
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
     ids = wiki_unique_df["document_id"].tolist()
 
     # Initialize tokenizer
+
     retriever = LearnedSparseRetrieval(
         embedding_method=args.embedding_method,  # 'splade','bge-m3'
         embedding_model_name=args.embedding_model_name,
@@ -77,11 +78,10 @@ def main():
         ]
     )
     logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
-    retrieved_output = retriever.retrieve(eval_df, sparse_metric_type = "IP", dense_metric_type = "IP", topk = args.topk)
-    output_file_name = f"{sparse_path_name}/outputs/retrieved_df_{args.embedding_method}_topk{args.topk}.csv"
+    retrieved_output = retriever.retrieve(eval_df, dense_metric_type = args.dense_metric_type, topk = args.topk)
     retrieved_df = retrieved_output[0]
-    retrieved_df.to_csv(output_file_name, index=False)
-    connections.disconnect(alias="wiki_embedding")
+    # output_file_name = f"{sparse_path_name}/outputs/retrieved_df_{args.embedding_method}_topk{args.topk}.csv"
+    # retrieved_df.to_csv(output_file_name, index=False)
 
     # Evaluate
     logger.info("Evaluating retrieval performance.")

@@ -52,7 +52,7 @@ class LearnedSparseRetrieval:
     def get_sparse_embedding_splade(self) -> NoReturn:
         # 저장 경로 지정: Connect to Milvus given URI
         sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        connections.connect(alias="wiki_embedding", uri=f"{sparse_path_name}/model/wiki_embedding.db")
+        connections.connect(uri=f"{sparse_path_name}/model/wiki_embedding.db")
 
         # 모델 지정
         self.ef = SpladeEmbeddingFunction(
@@ -60,7 +60,7 @@ class LearnedSparseRetrieval:
             device="cuda:0")
 
         # collection 조회. 없으면 생성
-        col_name = f"{self.embedding_method}_collection_{self.embedding_model_name}"
+        col_name = self.collection_name
         if utility.has_collection(col_name):
             self.col = Collection(col_name)
             index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
@@ -285,7 +285,7 @@ class LearnedSparseRetrieval:
     def dense_search(self, query_dense_embedding, dense_metric_type="IP", topk=10):
         search_params = {"metric_type": dense_metric_type, "params": {}}
         res = self.col.search(
-            tqdm(query_dense_embedding),
+            query_dense_embedding,
             anns_field="dense_vector",
             limit=topk,
             output_fields=["context"],
@@ -296,7 +296,7 @@ class LearnedSparseRetrieval:
     def sparse_search(self, query_sparse_embedding, topk=10):
         search_params = {"metric_type": "IP","params": {}}
         res = self.col.search(
-            tqdm(query_sparse_embedding),
+            query_sparse_embedding,
             anns_field="sparse_vector",
             limit=topk,
             output_fields=["context"],
