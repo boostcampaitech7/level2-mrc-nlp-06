@@ -2,11 +2,18 @@ import json
 import pandas as pd
 import numpy as np
 import sys
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/')
+import os
+# 절대 경로로 'utils' 폴더를 sys.path에 추가
+current_file_path = os.path.abspath(__file__)
+utils_path = os.path.abspath(os.path.join(current_file_path, "../../../retrieval/sparse/utils"))
+sparse_path = os.path.abspath(os.path.join(current_file_path, "../../../retrieval/sparse/src"))
+# print(f"UTILS_PATH: {utils_path}")  # 경로가 올바르게 출력되는지 확인
+sys.path.append(utils_path)
+sys.path.append(sparse_path)
 
-from retrieval.sparse.utils.utils_sparse_retrieval import load_config
-from retrieval.sparse.src.sparse_retrieval import SparseRetrieval
-from ODQA.utils_common import df_to_dataset
+from utils_sparse_retrieval import load_config
+from sparse_retrieval import SparseRetrieval
+from utils_common import df_to_dataset
 from transformers import AutoTokenizer
 
 class Sparse_Model():

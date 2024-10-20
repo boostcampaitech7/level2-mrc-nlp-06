@@ -2,8 +2,9 @@
 import logging
 import sys
 import os
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/ODQA')
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/reader')
+
+READER_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reader"))
+sys.path.append(READER_PATH)
 
 # ======= data processing ======= #
 import numpy as np
@@ -11,8 +12,8 @@ import pandas as pd
 from typing import Callable, Dict, List, NoReturn, Tuple
 
 # ======= extractive model ======= #
-from reader.utils.utils_mrc import json_to_Arguments, postprocess_qa_predictions
-from reader.extractive.src.trainer_ext import QuestionAnsweringTrainer
+from utils.utils_mrc import json_to_Arguments, postprocess_qa_predictions
+from extractive.src.trainer_ext import QuestionAnsweringTrainer
 
 
 # ======= Hugging face ======= #
@@ -60,24 +61,25 @@ class ExtractiveQA():
     def load_model(self):
         
         model_args, data_args, training_args = json_to_Arguments(self.config_path)
+        model_path = os.path.join(training_args.output_dir,"Extractive")
 
         # Model 불러오기
         self.model_config = AutoConfig.from_pretrained(
-            model_args.config_name
-            if model_args.config_name
-            else model_args.model_name_or_path,
+            model_path
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path,
+            model_path,
             use_fast=True,
         )
+        # 학습된 모델 불러오기
         self.model = AutoModelForQuestionAnswering.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            model_path, # train에서 finetuned_model 불러옴
+            from_tf=bool(".ckpt" in model_path),
             config=self.model_config,
         )
+        
+        training_args = TrainingArguments(**training_args)
+        training_args.do_predict = True
         
         return model_args, data_args, training_args
     
@@ -96,7 +98,6 @@ class ExtractiveQA():
         # Padding에 대한 옵션을 설정합니다.
         # (question|context) 혹은 (context|question)로 세팅 가능합니다.
         pad_on_right = self.tokenizer.padding_side == "right"
-
         # Validation preprocessing / 전처리를 진행합니다.
         def prepare_validation_features(examples):
             # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
@@ -105,7 +106,7 @@ class ExtractiveQA():
                 examples[question_column_name if pad_on_right else context_column_name],
                 examples[context_column_name if pad_on_right else question_column_name],
                 truncation="only_second" if pad_on_right else "only_first",
-                max_length=self.model_args.max_seq_length,
+                max_length=self.data_args.max_seq_length,
                 stride=self.data_args.doc_stride,
                 return_overflowing_tokens=True,
                 return_offsets_mapping=True,
@@ -166,7 +167,7 @@ class ExtractiveQA():
                 features=features,
                 predictions=predictions,
                 max_answer_length=self.data_args.max_answer_length,
-                output_dir=training_args.output_dir,
+                output_dir=self.training_args.output_dir,
             )
             # Metric을 구할 수 있도록 Format을 맞춰줍니다.
             formatted_predictions = [
@@ -185,10 +186,13 @@ class ExtractiveQA():
                     predictions=formatted_predictions, label_ids=references
                 )
 
+        # Set Method
         metric = load_metric("squad")
-
         def compute_metrics(p: EvalPrediction) -> Dict:
             return metric.compute(predictions=p.predictions, references=p.label_ids)
+
+        # Set Output_dir : test dataset과 validation dataset
+        self.training_args.output_dir=output_dir
 
         # Trainer 초기화
         trainer = QuestionAnsweringTrainer(

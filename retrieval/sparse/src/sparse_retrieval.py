@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 
 # 2단계 상위 경로를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.utils_sparse_retrieval import timer, hit, mrr
+from utils_sparse_retrieval import timer, hit, mrr
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -57,6 +57,10 @@ class SparseRetrieval:
             )
 
             logger.info("Saving TF-IDF pickle files.")
+            
+            if not os.isdir(os.path.join(sparse_path_name,"model")):
+                os.mkdir(os.path.join(sparse_path_name,"model"))
+
             with open(vectorizer_path, "wb") as file:
                 pickle.dump(self.tfidfv, file)
             with open(emb_path, "wb") as file:
@@ -81,6 +85,10 @@ class SparseRetrieval:
             self.bm25 = BM25Okapi(tokenized_corpus)
 
             logger.info("Saving BM25 pickle file.")
+            # model 폴더 존재여부 확인, 
+            if not os.isdir(os.path.join(sparse_path_name,"model")):
+                os.mkdir(os.path.join(sparse_path_name,"model"))
+
             with open(vectorizer_path, "wb") as file:
                 pickle.dump(self.bm25, file)
             logger.info("BM25 model saved.")
