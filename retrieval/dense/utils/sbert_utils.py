@@ -14,7 +14,7 @@ def load_datasets(path, data_type):
     return data
 
 def load_corpus(path):
-    with open(os.path.join(path, 'wikipedia_documents.json'), "r", encoding='utf-8') as f:
+    with open(os.path.join(path, 'wiki.json'), "r", encoding='utf-8') as f:
         corpus = json.load(f)
     
     print(f"loading documents\n")
