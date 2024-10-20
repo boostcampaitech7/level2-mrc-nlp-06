@@ -94,7 +94,7 @@ class BiEncoder():
         
         return results
 
-    def retrieve(self, data_type, stage, topk):
+    def retrieve(self, data_type, stage, topk, save_path=None):
         documents = load_corpus(self.data_path)
 
         data = load_datasets(self.data_path, data_type)
@@ -123,6 +123,9 @@ class BiEncoder():
                 for i, hit in tqdm(enumerate(hits), desc=f'retrieve {data_type}', total=len(hits)):
                     result_df.loc[i, 'context'] = ' '.join([documents[h['corpus_id']] for h in hit])
             
+            if save_path:
+                result_df.to_csv(os.path.join(save_path, 'bi-encoder-result.csv'))
+                
             return result_df
         elif stage == 2: # Bi-Encoder에서 retrieve한 결과를 re-ranking할 수 있도록 하는 형태
             return hits
@@ -189,7 +192,7 @@ class CrEncoder():
         
         return results
 
-    def retrieve(self, data_type, topk): # Cross Encoder만으로 retrieval 수행
+    def retrieve(self, data_type, topk, save_path=None): # Cross Encoder만으로 retrieval 수행
         documents = load_corpus(self.data_path)
 
         data = load_datasets(self.data_path, data_type)
@@ -214,9 +217,12 @@ class CrEncoder():
             for i, r in enumerate(results):
                 result_df.loc[i, 'context'] = ' '.join([d['text'] for d in r])
         
+        if save_path:
+            result_df.to_csv(os.path.join(save_path, 'cr-encoder-result.csv'))
+
         return result_df
 
-    def rerank(self, hits, data_type, topk):
+    def rerank(self, hits, data_type, topk, save_path=None):
         documents = load_corpus(self.data_path)
 
         data = load_datasets(self.data_path, data_type)
@@ -243,6 +249,9 @@ class CrEncoder():
             for i, r in enumerate(results):
                 result_df.loc[i, 'context'] = ' '.join([d['text'] for d in r])
         
+        if save_path:
+            result_df.to_csv(os.path.join(save_path, '2-stages-result.csv'))
+
         return result_df
 
     def get_embeddings(self):
