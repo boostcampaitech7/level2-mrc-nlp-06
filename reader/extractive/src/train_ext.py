@@ -5,8 +5,7 @@ import random
 import numpy as np
 import torch
 import argparse
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/reader')
-
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import NoReturn
 from datasets import DatasetDict, load_from_disk, load_metric
@@ -61,11 +60,11 @@ def main():
         training_args.do_eval=False
 
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.train_dataset_name}")
+    print(f"data is from {data_args.dataset_name}")
 
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.train_dataset_name)
+    datasets = load_from_disk(data_args.dataset_name)
     print(datasets)
 
     config = AutoConfig.from_pretrained(

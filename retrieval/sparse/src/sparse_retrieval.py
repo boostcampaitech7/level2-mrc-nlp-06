@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 
 # 2단계 상위 경로를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils_sparse_retrieval import timer, hit, mrr
+from utils.utils_sparse_retrieval import timer, hit, mrr
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",

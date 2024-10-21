@@ -1,9 +1,9 @@
 {
     "encoder_type": "cr-encoder",
-    "data_path": "../../../data",
+    "data_path": "../../../data/datasets/v0.0.1",
     "task": "train",
     "model": {
-        "name": "../../../sbert-cross-encoder",
+        "name": "monologg/koelectra-base-v3-discriminator",
         "epochs": 5,
         "batch_size": 32,
         "weight_decay": 0.01,
