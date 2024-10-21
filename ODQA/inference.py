@@ -40,6 +40,7 @@ from transformers import (
 # ========= Modules ========= #
 from modules.extractiveQA import ExtractiveQA
 from modules.spraseRetrieval import Sparse_Model
+from modules.denseRetrieval import Dense_Model
 from utils_common import json_to_config, dict_to_json
 
 
@@ -61,6 +62,8 @@ def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_d
             print("******* Sparse Retrieval Model 선택 *******")
             Ret_model = Sparse_Model(inference_config, test_datasets, wiki_path, valid_datasets)
         case "dense":
+            print(("******* Dense (SBERT) Retrieval Model 선택 *******"))
+            Ret_model = Dense_Model(inference_config, test_datasets, wiki_path, valid_datasets)
             pass
         case "hybrid":
             pass
@@ -127,34 +130,3 @@ if __name__ == "__main__":
         run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir)
     
     print("******* predict dataset Predictions *******")
-
-    
-    
-    # if args.do_valid:
-
-    #     # Validation Dataset 대해서도 Predictions 수행
-    #     output_dir = args.pred_dir
-
-    #     # logging 설정
-    #     logging.basicConfig(
-    #         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-    #         datefmt="%m/%d/%Y %H:%M:%S",
-    #         handlers=[logging.StreamHandler(sys.stdout)],
-    #     )
-    #     # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
-    #     logger.info("Training/evaluation parameters %s", training_args)
-
-    #     # 모델을 초기화하기 전에 난수를 고정합니다.
-    #     set_seed(training_args.seed)
-
-    #     datasets = load_from_disk(data_args.train_dataset_name)
-    #     answers = {data["id"]:data["answers"]["text"][0] for data in datasets["validation"]}
-    #     datasets = datasets.remove_columns(["title","context","answers","document_id","__index_level_0__"])
-    #     print("******* validation dataset Predictions *******")
-    #     print(datasets)
-    #     main(args, model_args, training_args, data_args, datasets)
-
-    #     # 기존 predictions 불러와서 정답 추가
-    #     dict_to_json(os.path.join(training_args.output_dir,"predictions.json"),
-    #                  os.path.join(training_args.output_dir,"prediction_with_ans.json"),
-    #                  answers)
