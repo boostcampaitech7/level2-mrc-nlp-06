@@ -1,0 +1,5 @@
+{
+    "qa_config":"/data/ephemeral/home/jh/level2-mrc-nlp-06/reader/extractive/config/base_config.json",
+    "retrieval_config":"sparse_retrieval_config_example",
+    "datasets":"/data/ephemeral/home/jh/data/datasets/v0.0.1"
+}

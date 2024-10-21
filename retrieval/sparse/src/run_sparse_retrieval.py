@@ -43,6 +43,7 @@ def main():
     wiki_df = pd.DataFrame(wiki.values())
     wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
+    document_ids = wiki_unique_df["document_id"].tolist()
 
     # Initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_model_name, use_fast=True)
@@ -50,6 +51,7 @@ def main():
         embedding_method=args.embedding_method,  # 'tfidf','bm25'
         tokenizer=tokenizer,
         contexts=contexts,
+        document_ids=document_ids
     )
 
     # Generate embeddings
@@ -60,31 +62,44 @@ def main():
         elif args.embedding_method == "bm25":
             retriever.get_sparse_embedding_bm25()
 
-    # Evaluate
-    logger.info("Evaluating retrieval performance.")
-    evaluation_results = {}
-    for eval_method in args.eval_metric:
-        with timer(f"Evaluation {eval_method}"):
-            result = retriever.evaluate(
-                eval_data_path=args.eval_data_path,
-                topk=args.topk,
-                eval_metric=eval_method,
-            )
-            evaluation_results[eval_method] = result
-
-    # Record total end time
-    total_end_time = time.time()
-    total_time = total_end_time - total_start_time
-    logger.info(f"Total execution time: {total_time:.3f} s")
-
-    # Append to CSV
-    sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    append_to_csv(
-        f"{sparse_path_name}/outputs/sparse_embedding_test_{args.embedding_method}.csv",
-        args,
-        total_time,
-        evaluation_results,
+    # Retrieve
+    from datasets import load_from_disk, concatenate_datasets
+    org_dataset = load_from_disk(args.eval_data_path)
+    eval_df = concatenate_datasets(
+        [
+            org_dataset["train"].flatten_indices(),
+            org_dataset["validation"].flatten_indices(),
+        ]
     )
+    logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
+
+    result_df = retriever.retrieve(eval_df, topk=args.topk, save=True, retrieval_save_path=args.retrieval_save_path)
+
+    # # Evaluate
+    # logger.info("Evaluating retrieval performance.")
+    # evaluation_results = {}
+    # for eval_method in args.eval_metric:
+    #     with timer(f"Evaluation {eval_method}"):
+    #         result = retriever.evaluate(
+    #             eval_data_path=args.eval_data_path,
+    #             topk=args.topk,
+    #             eval_metric=eval_method,
+    #         )
+    #         evaluation_results[eval_method] = result
+
+    # # Record total end time
+    # total_end_time = time.time()
+    # total_time = total_end_time - total_start_time
+    # logger.info(f"Total execution time: {total_time:.3f} s")
+
+    # # Append to CSV
+    # sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # append_to_csv(
+    #     f"{sparse_path_name}/outputs/sparse_embedding_test_{args.embedding_method}.csv",
+    #     args,
+    #     total_time,
+    #     evaluation_results,
+    # )
 
     logger.info("Sparse Retrieval System finished execution.")
 

@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class SparseRetrieval:
-    def __init__(self, embedding_method: str, tokenizer, contexts) -> NoReturn:
+    def __init__(self, embedding_method: str, tokenizer, contexts, document_ids) -> NoReturn:
 
         self.embedding_method = embedding_method
         self.tokenize_fn = tokenizer.tokenize
         self.contexts = contexts
+        self.document_ids = document_ids
         self.tfidfv = None
         self.p_embedding = None
         self.bm25 = None
@@ -78,7 +79,7 @@ class SparseRetrieval:
                 self.tokenize_fn(doc)
                 for doc in tqdm(self.contexts, desc="Tokenizing for BM25")
             ]
-            self.bm25 = BM25Okapi(tokenized_corpus)
+            self.bm25 = BM25Okapi(tokenized_corpus, k1=1.0)
 
             logger.info("Saving BM25 pickle file.")
             with open(vectorizer_path, "wb") as file:
@@ -86,7 +87,7 @@ class SparseRetrieval:
             logger.info("BM25 model saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, save: Optional[bool] = True, retrieval_save_path: Optional[str] = ""
     ) -> Union[Tuple[List, List], pd.DataFrame]:
 
         if self.embedding_method == "tfidf":
@@ -137,13 +138,15 @@ class SparseRetrieval:
                 tqdm(query_or_dataset, desc="Sparse retrieval: ")
             ):
                 retrieved_contexts = [self.contexts[pid] for pid in doc_indices[idx]]
+                retrieved_document_ids = [self.document_ids[pid] for pid in doc_indices[idx]]
 
                 retrieved_dict = {
                     # 쿼리와 해당 ID 반환
                     "question": example["question"],
                     "id": example["id"],
+                    "document_id": retrieved_document_ids,
                     # retrieve한 passage의 context 이어 붙이기
-                    "context": " ".join(retrieved_contexts),
+                    # "context": " ".join(retrieved_contexts),
                 }
                 if "context" in example.keys() and "answers" in example.keys():
                     retrieved_dict["original_context"] = example["context"]
@@ -157,6 +160,8 @@ class SparseRetrieval:
                 retrieved_data.append(retrieved_dict)
 
             retrieved_df = pd.DataFrame(retrieved_data)
+            if save:
+                retrieved_df.to_csv(retrieval_save_path, index=False)
             logger.info("Completed retrieval for dataset queries.")
 
             return retrieved_df
