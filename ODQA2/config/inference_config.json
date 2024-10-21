@@ -1,0 +1,5 @@
+{
+    "reader": "/data/ephemeral/home/osh/level2-mrc-nlp-06/reader2/config/extraction_config.json",
+    "retriever": "/data/ephemeral/home/osh/level2-mrc-nlp-06/retrieval/sparse/config/sparse_retrieval_config_example.json",
+    "save_path": "/data/ephemeral/home/osh/level2-mrc-nlp-06/ODQA2/outputs"
+}
