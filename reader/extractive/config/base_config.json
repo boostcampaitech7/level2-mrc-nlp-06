@@ -7,8 +7,8 @@
         "retrieval_type":"dense"
     },
     "data_args":{
-        "train_dataset_name":"../data/train_dataset",
-        "test_dataset_name":"../data/test_dataset",
+        "train_dataset_name":"../data/prev/train_dataset",
+        "test_dataset_name":"../data/prev/test_dataset",
         "overwrite_cache":true,
         "preprocessing_num_workers":null,
         "max_seq_length":384,
@@ -21,7 +21,7 @@
         "use_faiss":false
     },
     "training_args":{
-        "output_dir":"/data/ephemeral/home/jh/level2-mrc-nlp-06/models/outputs",
+        "output_dir":"/data/ephemeral/home/jh/level2-mrc-nlp-06/reader/extractive/models/outputs",
         "evaluation_strategy":"no",
         "eval_steps":50,
         "per_device_train_batch_size":8,
