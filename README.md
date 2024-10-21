@@ -6,7 +6,7 @@ retriever와 reader에서 서로 다른 전처리를 적용한 데이터셋을 �
 ### Sparse Embedding  
 실행 경로: `./retrieval/sparse/`  
 ```bash
-python src/run_sparse_retrieval --config config/sparse_retrieval_config
+python src/run_sparse_retrieval --config sparse_retrieval_config_example
 ```  
 결과: `./retrieval/sparse/model/`에 sparse embedding 결과인 `.bin` 파일 생성  
 (없으면 생성 후 추론, 있으면 바로 추론)  
