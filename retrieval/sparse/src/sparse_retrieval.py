@@ -28,7 +28,7 @@ class SparseRetrieval:
     def __init__(self, embedding_method: str, tokenizer, contexts) -> NoReturn:
 
         self.embedding_method = embedding_method
-        self.tokenize_fn = tokenizer.tokenize
+        self.tokenize_fn = tokenizer
         self.contexts = contexts
         self.tfidfv = None
         self.p_embedding = None
@@ -50,7 +50,8 @@ class SparseRetrieval:
         else:
             logger.info("Build TF-IDF passage embedding")
             self.tfidfv = TfidfVectorizer(
-                tokenizer=self.tokenize_fn, ngram_range=(1, 2), max_features=50000
+                tokenizer=self.tokenize_fn, ngram_range=(1, 3), max_features=None,
+                sublinear_tf=True
             )
             self.p_embedding = self.tfidfv.fit_transform(
                 tqdm(self.contexts, desc="TF-IDF Vectorization")
@@ -78,7 +79,7 @@ class SparseRetrieval:
                 self.tokenize_fn(doc)
                 for doc in tqdm(self.contexts, desc="Tokenizing for BM25")
             ]
-            self.bm25 = BM25Okapi(tokenized_corpus)
+            self.bm25 = BM25Okapi(tokenized_corpus, k1=1.0)
 
             logger.info("Saving BM25 pickle file.")
             with open(vectorizer_path, "wb") as file:
@@ -268,30 +269,21 @@ class SparseRetrieval:
 
         return doc_scores, doc_indices
 
+
     def evaluate(
         self,
-        eval_data_path,
+        retrieved_df,
         topk,
         eval_metric: str = "hit",
     ):
-        logger.info("Loading evaluation dataset from %s", eval_data_path)
-        org_dataset = load_from_disk(eval_data_path)
-        eval_df = concatenate_datasets(
-            [
-                org_dataset["train"].flatten_indices(),
-                org_dataset["validation"].flatten_indices(),
-            ]
-        )
-        logger.info("Evaluation dataset loaded with %d examples.", len(eval_df))
 
-        result_df = self.retrieve(eval_df, topk=topk)
         if eval_metric == "hit":  # k개의 추천 중 선호 아이템이 있는지 측정
-            hit_at_k = hit(result_df)
+            hit_at_k = hit(retrieved_df)
             logger.info(f"Hit@{topk}: {hit_at_k:.4f}")
             return hit_at_k
 
         elif eval_metric == "mrr":
-            mrr_at_k = mrr(result_df)
+            mrr_at_k = mrr(retrieved_df)
             logger.info(f"MRR@{topk}: {mrr_at_k:.4f}")
             return mrr_at_k
 

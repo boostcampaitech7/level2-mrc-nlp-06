@@ -11,6 +11,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils_sparse_retrieval import load_config, timer, append_to_csv
 from sparse_retrieval import SparseRetrieval
 
+from konlpy.tag import Mecab, Hannanum, Kkma, Komoran, Okt
+# morphs: 형태소 분석
+mecab_tokenizer = Mecab().morphs
+
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -43,24 +47,14 @@ def main():
     wiki_df = pd.DataFrame(wiki.values())
     wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
-    contexts = contexts[:10]  # 테스트용 코드
 
     # Initialize tokenizer
-    if args.embedding_method in ['tfidf','bm25']:
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_model_name, use_fast=True)
-        retriever = SparseRetrieval(
-            embedding_method=args.embedding_method,  # 'tfidf','bm25'
-            contexts=contexts,
-            tokenizer=tokenizer,
-        )
-    elif args.embedding_method == "bge-m3":
-        retriever = SparseRetrieval(
-            embedding_method=args.embedding_method,  # 'tfidf','bm25'
-            contexts=contexts,
-            aggregation_method=args.aggregation_method,
-            similarity_metric=args.similarity_metric,
-            embedding_model_name=args.embedding_model_name
-        )
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_model_name, use_fast=True)
+    retriever = SparseRetrieval(
+        embedding_method=args.embedding_method,  # 'tfidf','bm25'
+        tokenizer=tokenizer.tokenize,
+        contexts=contexts,
+    )
 
     # Generate embeddings
     logger.info("Generating sparse embeddings.")
@@ -69,15 +63,12 @@ def main():
             retriever.get_sparse_embedding_tfidf()
         elif args.embedding_method == "bm25":
             retriever.get_sparse_embedding_bm25()
-        elif args.embedding_method == "bge-m3":
-            retriever.get_sparse_embedding_learned()
 
     # Evaluate
     logger.info("Evaluating retrieval performance.")
     evaluation_results = {}
     for eval_method in args.eval_metric:
         with timer(f"Evaluation {eval_method}"):
-            print("evaluation_start")
             result = retriever.evaluate(
                 eval_data_path=args.eval_data_path,
                 topk=args.topk,
