@@ -3,9 +3,9 @@
     "embedding_method": "bge-m3",
     "bgem3_type": "dense",
     "dense_metric_type": "IP",
-    "embedding_model_name": "upskyy/bge-m3-korean",
-    "collection_name": "collection_bge_upskyy_cosine",
+    "embedding_model_name": "BAAI/bge-m3",
+    "collection_name": "collection_bge_BAAI_IP",
     "topk": 10,
-    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1/train_dataset",
+    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1",
     "eval_metric": ["hit", "mrr"]
 }
