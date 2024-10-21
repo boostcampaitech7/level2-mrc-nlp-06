@@ -79,7 +79,7 @@ class SparseRetrieval:
                 self.tokenize_fn(doc)
                 for doc in tqdm(self.contexts, desc="Tokenizing for BM25")
             ]
-            self.bm25 = BM25Okapi(tokenized_corpus)
+            self.bm25 = BM25Okapi(tokenized_corpus, k1=1.0)
 
             logger.info("Saving BM25 pickle file.")
             with open(vectorizer_path, "wb") as file:
