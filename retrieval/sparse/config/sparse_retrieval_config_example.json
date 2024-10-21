@@ -1,8 +1,9 @@
 {
-    "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
+    "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.2/wikipedia_documents.json",
     "embedding_method": "bm25",
     "topk": 10,
     "tokenizer_model_name": "klue/bert-base",
-    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1/train_dataset",
-    "eval_metric": ["hit", "mrr"]
+    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.2",
+    "eval_metric": ["hit", "mrr"],
+    "retrieval_save_path": "/data/ephemeral/home/minji2/ODQA/outputs/retrieval/test.csv"
 }
