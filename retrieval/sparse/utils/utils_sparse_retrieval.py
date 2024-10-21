@@ -56,6 +56,18 @@ def mrr(df):
     mrr_at_k = mrr_total / len(df)
     return mrr_at_k
 
+def evaluate(
+    retrieved_df,
+    eval_metric: str = "hit",
+):
+    if eval_metric == "hit":  # k개의 추천 중 선호 아이템이 있는지 측정
+        hit_at_k = hit(retrieved_df)
+        return hit_at_k
+
+    elif eval_metric == "mrr":
+        mrr_at_k = mrr(retrieved_df)
+        return mrr_at_k
+
 
 def append_to_csv(output_csv: str, args, total_time, evaluation_results):
     row = {

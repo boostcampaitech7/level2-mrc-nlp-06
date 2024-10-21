@@ -1,19 +1,34 @@
-import logging
+
 import sys
 import os
-import pickle
+import logging
+from tqdm.auto import tqdm
 from typing import List, NoReturn, Optional, Tuple, Union
-
 import numpy as np
 import pandas as pd
-from datasets import Dataset, concatenate_datasets, load_from_disk
+import pickle
+import torch
+from datasets import Dataset
 from sklearn.feature_extraction.text import TfidfVectorizer
 from rank_bm25 import BM25Okapi
-from tqdm.auto import tqdm
+
+from pymilvus import (
+    connections,
+    utility,
+    FieldSchema,
+    CollectionSchema,
+    DataType,
+    Collection,
+    AnnSearchRequest,
+    WeightedRanker,
+)
+from pymilvus.model.hybrid import BGEM3EmbeddingFunction
+from pymilvus.model.sparse import SpladeEmbeddingFunction
+
 
 # 2단계 상위 경로를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils_sparse_retrieval import timer, hit, mrr
+from utils.utils_sparse_retrieval import timer, hit, mrr, pooling_fn
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
@@ -28,7 +43,7 @@ class SparseRetrieval:
     def __init__(self, embedding_method: str, tokenizer, contexts) -> NoReturn:
 
         self.embedding_method = embedding_method
-        self.tokenize_fn = tokenizer
+        self.tokenizer = tokenizer
         self.contexts = contexts
         self.tfidfv = None
         self.p_embedding = None
@@ -50,7 +65,7 @@ class SparseRetrieval:
         else:
             logger.info("Build TF-IDF passage embedding")
             self.tfidfv = TfidfVectorizer(
-                tokenizer=self.tokenize_fn, ngram_range=(1, 3), max_features=None,
+                tokenizer=self.tokenizer, ngram_range=(1, 3), max_features=None,
                 sublinear_tf=True
             )
             self.p_embedding = self.tfidfv.fit_transform(
@@ -59,7 +74,7 @@ class SparseRetrieval:
 
             logger.info("Saving TF-IDF pickle files.")
             
-            if not os.isdir(os.path.join(sparse_path_name,"model")):
+            if not os.path.isdir(os.path.join(sparse_path_name,"model")):
                 os.mkdir(os.path.join(sparse_path_name,"model"))
 
             with open(vectorizer_path, "wb") as file:
@@ -79,15 +94,11 @@ class SparseRetrieval:
                 self.bm25 = pickle.load(file)
         else:
             logger.info("Fitting BM25 model.")
-            tokenized_corpus = [
-                self.tokenize_fn(doc)
-                for doc in tqdm(self.contexts, desc="Tokenizing for BM25")
-            ]
-            self.bm25 = BM25Okapi(tokenized_corpus, k1=1.0)
+            self.bm25 = BM25Okapi(tqdm(self.contexts, desc="Tokenizing for BM25"), tokenizer = self.tokenizer, k1=1.0)
 
             logger.info("Saving BM25 pickle file.")
             # model 폴더 존재여부 확인, 
-            if not os.isdir(os.path.join(sparse_path_name,"model")):
+            if not os.path.isdir(os.path.join(sparse_path_name,"model")):
                 os.mkdir(os.path.join(sparse_path_name,"model"))
 
             with open(vectorizer_path, "wb") as file:
@@ -95,7 +106,7 @@ class SparseRetrieval:
             logger.info("BM25 model saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, save: Optional[bool] = True, retrieval_save_path: Optional[str] = "../outputs/"
     ) -> Union[Tuple[List, List], pd.DataFrame]:
 
         if self.embedding_method == "tfidf":
@@ -166,6 +177,9 @@ class SparseRetrieval:
                 retrieved_data.append(retrieved_dict)
 
             retrieved_df = pd.DataFrame(retrieved_data)
+            if save:
+                retrieved_file_name = retrieval_save_path + self.embedding_method + '.csv'
+                retrieved_df.to_csv(retrieved_file_name, index=False)
             logger.info("Completed retrieval for dataset queries.")
 
             return retrieved_df
@@ -215,7 +229,7 @@ class SparseRetrieval:
     def get_relevant_doc_bm25(
         self, query: str, k: Optional[int] = 1
     ) -> Tuple[List, List]:
-        tokenized_query = self.tokenize_fn(query)
+        tokenized_query = self.tokenizer(query)
         doc_scores = self.bm25.get_scores(tokenized_query)
 
         sorted_result = np.argsort(doc_scores)[::-1]
@@ -227,7 +241,7 @@ class SparseRetrieval:
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
 
-        tokenized_queries = [self.tokenize_fn(query) for query in queries]
+        tokenized_queries = [self.tokenizer(query) for query in queries]
         all_query_terms = set(term for query in tokenized_queries for term in query)
 
         # frequency matrix for all query terms to all documents
@@ -298,3 +312,298 @@ class SparseRetrieval:
         else:
             logger.warning("Unsupported evaluation method: %s", eval_metric)
             return None
+
+
+
+class LearnedSparseRetrieval:
+    def __init__(self, embedding_method, embedding_model_name, contexts, ids, collection_name, bgem3_type="sparse", dense_metric_type="IP") -> NoReturn:
+
+        self.embedding_method = embedding_method
+        self.embedding_model_name = embedding_model_name
+        self.contexts = contexts
+        self.ids = ids 
+        self.collection_name = collection_name
+        self.bgem3_type = bgem3_type  # sparse, dense, hybrid
+        self.dense_metric_type = dense_metric_type
+        self.ef = None
+        self.col = None
+
+    def get_sparse_embedding_splade(self) -> NoReturn:
+        # 저장 경로 지정: Connect to Milvus given URI
+        sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        connections.connect(uri=f"{sparse_path_name}/model/wiki_embedding.db")
+
+        # 모델 지정
+        self.ef = SpladeEmbeddingFunction(
+            model_name=self.embedding_model_name, 
+            device="cuda:0")
+
+        # collection 조회. 없으면 생성
+        col_name = self.collection_name
+        if utility.has_collection(col_name):
+            self.col = Collection(col_name)
+            index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
+            self.col.create_index("sparse_vector", index)
+            self.col.load()
+            logger.info(f"Collection \"{self.collection_name}\" is loaded.")
+            logger.info(f"Number of entities contained: {self.col.num_entities}")
+        else:
+            # 데이터 스키마 지정
+            fields = [
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+                FieldSchema(name="context", dtype=DataType.VARCHAR, max_length=65535),
+                FieldSchema(name="sparse_vector", dtype=DataType.SPARSE_FLOAT_VECTOR),
+            ]
+            schema = CollectionSchema(fields, description="Collection for SPLADE embeddings")
+            self.col = Collection(col_name, schema, consistency_level="Strong")
+            index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
+            self.col.create_index("sparse_vector", index)
+            self.col.load()
+
+            # 임베딩 생성 
+            batch_size = 4
+            for i in tqdm(range(0, len(self.contexts), batch_size)):
+                # 마지막 배치에서 범위를 초과하지 않도록 min 사용
+                end_idx = min(i + batch_size, len(self.contexts))
+
+                batch_ids = self.ids[i:end_idx]
+                batch_contexts = self.contexts[i:end_idx]
+
+                torch.cuda.empty_cache()
+                with torch.no_grad():
+                    batch_docs_embeddings = self.ef.encode_documents(batch_contexts)
+                    batch_entities = []
+                    for j in range(len(batch_ids)):
+                        entity = {
+                            "id": batch_ids[j],
+                            "context": batch_contexts[j],
+                            "sparse_vector": batch_docs_embeddings[[j], :],
+                        }
+                        batch_entities.append(entity)
+
+                    self.col.insert(batch_entities)
+            logger.info(f"Number of entities inserted: {self.col.num_entities}")
+
+    def get_sparse_embedding_bgem3(self) -> NoReturn:
+        # 저장 경로 지정: Connect to Milvus given URI
+        sparse_path_name = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        connections.connect(uri=f"{sparse_path_name}/model/wiki_embedding.db")
+
+        # 모델 지정
+        self.ef = BGEM3EmbeddingFunction(
+            model_name=self.embedding_model_name, # Specify the model name
+            device="cuda:0", # Specify the device to use, e.g., 'cpu' or 'cuda:0'
+            use_fp16=True, # Specify whether to use fp16. Set to `False` if `device` is `cpu`.
+            return_sparse=True, # only allow the dense embedding output
+            return_dense=True # only allow the sparse embedding output
+        )
+        dense_dim = self.ef.dim['dense']        
+
+        # collection 조회. 없으면 생성
+        col_name = self.collection_name
+        if utility.has_collection(col_name):
+            self.col = Collection(col_name)
+            index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
+            self.col.create_index("sparse_vector", index)
+            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type} 
+            self.col.create_index("dense_vector", index)
+            self.col.load()
+            logger.info(f"Collection \"{self.collection_name}\" is loaded.")
+            logger.info(f"Number of entities contained: {self.col.num_entities}")
+        else:
+            # 데이터 스키마 지정
+            fields = [
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True), #auto_id=True),
+                FieldSchema(name="context", dtype=DataType.VARCHAR, max_length=65535),
+                FieldSchema(name="sparse_vector", dtype=DataType.SPARSE_FLOAT_VECTOR),
+                FieldSchema(name="dense_vector", dtype=DataType.FLOAT16_VECTOR, dim=dense_dim)
+            ]
+            schema = CollectionSchema(fields, description="Collection for BGE M3 embeddings")
+            self.col = Collection(col_name, schema, consistency_level="Strong")
+            index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
+            self.col.create_index("sparse_vector", index)
+            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type} 
+            self.col.create_index("dense_vector", index)
+            self.col.load()
+
+            # 임베딩 생성 
+            batch_size = 4
+            for i in tqdm(range(0, len(self.contexts), batch_size)):
+                # 마지막 배치에서 범위를 초과하지 않도록 min 사용
+                end_idx = min(i + batch_size, len(self.contexts))
+
+                batch_ids = self.ids[i:end_idx]
+                batch_contexts = self.contexts[i:end_idx]
+
+                torch.cuda.empty_cache()
+                with torch.no_grad():
+                    batch_docs_embeddings = self.ef.encode_documents(batch_contexts)
+                    batch_sparse_embeddings = batch_docs_embeddings['sparse']
+                    batch_dense_embeddings = batch_docs_embeddings['dense']
+
+                    batch_entities = []
+                    for j in range(len(batch_ids)):
+                        entity = {
+                            "id": batch_ids[j],
+                            "context": batch_contexts[j],
+                            "sparse_vector": batch_sparse_embeddings[[j], :],
+                            "dense_vector": batch_dense_embeddings[j]
+                        }
+                        batch_entities.append(entity)
+
+                    self.col.insert(batch_entities)
+            logger.info(f"Number of entities inserted:{self.col.num_entities}")
+
+    def retrieve(
+        self, query_or_dataset: Union[str, Dataset], dense_metric_type = "IP", topk = 10, save: Optional[bool] = True, retrieval_save_path: Optional[str] = "../outputs/"
+    ) -> Union[Tuple[List, List], pd.DataFrame]:
+
+        assert self.ef is not None and self.col is not None, "get_sparse_embedding() 메소드를 먼저 수행해주세요."
+
+        if isinstance(query_or_dataset, str):
+            query = [query_or_dataset]
+            query_embeddings = self.ef.encode_queries(query)
+            if self.embedding_method=="splade":
+                search_result = self.sparse_search(query_embeddings, topk)
+                doc_scores = []
+                doc_contexts = []
+                for i in range(len(search_result)):
+                    doc_scores.append(search_result[i].score)
+                    doc_contexts.append(search_result[i].get('context'))
+
+                logger.info(f"[Search query]\n{query_or_dataset}\n")
+                for i in range(topk):
+                    logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
+                    logger.debug(f"Passage: {doc_contexts[i]}")
+
+                return (doc_scores, doc_contexts)
+            
+            elif self.embedding_method=="bge-m3":
+                if self.bgem3_type == "sparse":
+                    search_result = self.sparse_search(query_embeddings['sparse'], topk)
+                    doc_scores = []
+                    doc_contexts = []
+                    for i in range(len(search_result)):
+                        doc_scores.append(search_result[i].score)
+                        doc_contexts.append(search_result[i].get('context'))
+                    logger.info(f"[Sparse - Search query]\n{query_or_dataset}\n")
+                    for i in range(topk):
+                        logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
+                        logger.debug(f"Passage: {doc_contexts[i]}")
+                    return (doc_scores, doc_contexts)
+                
+                elif self.bgem3_type == "dense":
+                    search_result = self.dense_search(query_embeddings['dense'], dense_metric_type, topk)
+                    doc_scores = []
+                    doc_contexts = []
+                    for i in range(len(search_result)):
+                        doc_scores.append(search_result[i].score)
+                        doc_contexts.append(search_result[i].get('context'))
+                    logger.info(f"[Dense - Search query]\n{query_or_dataset}\n")
+                    for i in range(topk):
+                        logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
+                        logger.debug(f"Passage: {doc_contexts[i]}")
+                    return (doc_scores, doc_contexts)
+
+                elif self.bgem3_type == "hybrid":
+                    search_result = self.hybrid_search(query_embeddings['dense'], query_embeddings['sparse'], dense_metric_type, sparse_weight=1.0, dense_weight=1.0, topk=topk)
+                    doc_scores = []
+                    doc_contexts = []
+                    for i in range(len(search_result)):
+                        doc_scores.append(search_result[i].score)
+                        doc_contexts.append(search_result[i].get('context'))
+                    logger.info(f"[Hybrid - Search query]\n{query_or_dataset}\n")
+                    for i in range(topk):
+                        logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
+                        logger.debug(f"Passage: {doc_contexts[i]}")
+                    return (doc_scores, doc_contexts)
+
+        elif isinstance(query_or_dataset, Dataset):
+            logger.info("Retrieving for dataset queries.")
+            queries = query_or_dataset["question"]
+            query_embeddings = self.ef.encode_queries(queries)
+            if self.embedding_method == "splade":
+                search_result = self.sparse_search(query_embeddings, topk)
+            elif self.embedding_method == "bge-m3":
+                if self.bgem3_type == "sparse":
+                    search_result = self.sparse_search(query_embeddings['sparse'], topk)
+                elif self.bgem3_type == "dense":
+                    search_result = self.dense_search(query_embeddings['dense'], dense_metric_type, topk)
+                elif self.bgem3_type == "hybrid":
+                    search_result = self.hybrid_search(query_embeddings['dense'], query_embeddings['sparse'], dense_metric_type, sparse_weight=1.0, dense_weight=1.0, topk=topk)
+            
+            retrieved_data = []  # dictionary list to save result
+            # retrieved_contexts_list = []  
+            for idx, example in enumerate(query_or_dataset):
+                retrieved_contexts = [hit.get("context") for hit in search_result[idx]]
+                # retrieved_contexts_list.append(retrieved_contexts)
+
+                retrieved_dict = {
+                    "question": example['question'],
+                    "id": example['id'],
+                    "context": " ".join(retrieved_contexts)
+                }
+
+                if "context" in example.keys() and "answers" in example.keys():
+                    retrieved_dict["original_context"] = example["context"]
+                    retrieved_dict["answers"] = example["answers"]
+                    try:
+                        retrieved_dict["rank"] = (
+                            retrieved_contexts.index(example["context"]) + 1
+                        )
+                    except ValueError:
+                        retrieved_dict["rank"] = 0  # 정답 문서가 없으면 0
+
+                retrieved_data.append(retrieved_dict)
+
+            retrieved_df = pd.DataFrame(retrieved_data)
+            if save:
+                retrieved_file_name = retrieval_save_path + self.embedding_method + '_retrieved_df.csv'
+                retrieved_df.to_csv(retrieved_file_name, index=False)
+            logger.info("Completed retrieval for dataset queries.")
+            return retrieved_df #, retrieved_contexts_list
+
+
+    def dense_search(self, query_dense_embedding, dense_metric_type="IP", topk=10):
+        search_params = {"metric_type": dense_metric_type, "params": {}}
+        res = self.col.search(
+            query_dense_embedding,
+            anns_field="dense_vector",
+            limit=topk,
+            output_fields=["context"],
+            param=search_params,
+        )
+        return res
+    
+    def sparse_search(self, query_sparse_embedding, topk=10):
+        search_params = {"metric_type": "IP","params": {}}
+        res = self.col.search(
+            query_sparse_embedding,
+            anns_field="sparse_vector",
+            limit=topk,
+            output_fields=["context"],
+            param=search_params,
+        )
+        return res
+    
+    def hybrid_search(
+            self,
+            query_dense_embedding, query_sparse_embedding,
+            dense_metric_type='IP',
+            sparse_weight=1.0, dense_weight=1.0,
+            topk=10,
+    ):
+
+        dense_search_params = {"metric_type": dense_metric_type, "params": {}}
+        dense_req = AnnSearchRequest(
+            query_dense_embedding, "dense_vector", dense_search_params, limit=topk
+        )
+        sparse_search_params = {"metric_type": "IP", "params": {}}
+        sparse_req = AnnSearchRequest(
+            query_sparse_embedding, "sparse_vector", sparse_search_params, limit=topk
+        )
+        rerank = WeightedRanker(sparse_weight, dense_weight)
+        res = self.col.hybrid_search(
+            [sparse_req, dense_req], rerank=rerank, limit=topk, output_fields=["context"]
+        )
+        return res
