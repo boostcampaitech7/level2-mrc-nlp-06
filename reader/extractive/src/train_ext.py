@@ -5,7 +5,9 @@ import random
 import numpy as np
 import torch
 import argparse
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+print(os.path.join(os.getcwd(),"reader"))
+sys.path.append(os.path.join(os.getcwd(),"reader"))
 
 from typing import NoReturn
 from datasets import DatasetDict, load_from_disk, load_metric
@@ -20,7 +22,7 @@ from transformers import (
 )
 import nltk
 
-from extractive.src.trainer_ext import QuestionAnsweringTrainer
+from trainer_ext import QuestionAnsweringTrainer
 from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
 from utils.preprocessing import get_train_dataset
 
