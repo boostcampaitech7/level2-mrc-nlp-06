@@ -7,8 +7,7 @@
         "retrieval_type":"dense"
     },
     "data_args":{
-        "train_dataset_name":"../data/train_dataset",
-        "test_dataset_name":"../data/test_dataset",
+        "dataset_name":"../data/datasets/v0.0.4",
         "overwrite_cache":true,
         "preprocessing_num_workers":null,
         "max_seq_length":384,
@@ -21,18 +20,18 @@
         "use_faiss":false
     },
     "training_args":{
-        "output_dir":"/data/ephemeral/home/jh/level2-mrc-nlp-06/models/outputs",
+        "output_dir":"/data/ephemeral/home/jh/level2-mrc-nlp-06/reader/extractive/models/outputs",
         "evaluation_strategy":"no",
         "eval_steps":50,
         "per_device_train_batch_size":8,
         "per_device_eval_batch_size":16,
         "learning_rate":1e-5,
-        "num_train_epochs":1,
+        "num_train_epochs":3,
         "warmup_steps":500,
         "logging_dir":"../logs",
         "logging_steps":500,
         "save_steps":500,
-        "save_total_limit":2,
+        "save_total_limit":1,
         "fp16":true,
         "load_best_model_at_end":false,
         "seed":42,

@@ -12,8 +12,8 @@ from sentence_transformers.cross_encoder.evaluation import CERerankingEvaluator
 from sentence_transformers import (util, losses, CrossEncoder, InputExample,
                                    SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments)
 
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from utils.sbert_utils import load_corpus, load_datasets
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from sbert_utils import load_corpus, load_datasets
 
 
 class BiEncoder():
@@ -50,8 +50,8 @@ class BiEncoder():
             save_strategy="steps",
             save_steps=500,
             save_total_limit=2,
-            logging_steps=100,
-            run_name="sbert-5",  # Will be used in W&B if `wandb` is installed
+            logging_steps=100
+            # run_name="sbert-5",  # Will be used in W&B if `wandb` is installed
         )
 
         trainer = SentenceTransformerTrainer(
