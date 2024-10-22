@@ -39,7 +39,7 @@ def json_to_config(json_file):
 
     return args_box
 
-def df_to_dataset(df, do_predict):
+def df_to_dataset(df, do_predict, do_eval):
     if do_predict:
         f = Features(
             {
@@ -48,6 +48,21 @@ def df_to_dataset(df, do_predict):
                 "question": Value(dtype="string", id=None),
             }
         )
-
+    elif do_eval:
+        f = Features(
+            {
+                "context": Value(dtype="string", id=None),
+                "question": Value(dtype="string", id=None),
+                "id": Value(dtype="string", id=None),
+                "answers": Sequence(
+                    feature={
+                        "text": Value(dtype="string", id=None),
+                        "answer_start": Value(dtype="int64", id=None),
+                    },
+                    length=-1,
+                    id=None,
+                ),
+            }
+        )
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets

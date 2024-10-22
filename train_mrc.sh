@@ -1,4 +1,4 @@
-config_name="./reader/extractive/config/base_config.json"
+config_name="./reader/extractive/config/base_config_v006.json"
 
 # 기본값 설정
 DO_EVAL=false
@@ -43,4 +43,4 @@ else
     exit 1
 fi
 
-# bash reader/train_mrc.sh --type=ext --do_eval
+# bash train_mrc.sh --type=ext --do_eval

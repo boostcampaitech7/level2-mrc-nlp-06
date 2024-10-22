@@ -18,7 +18,8 @@ from transformers import AutoTokenizer
 
 class Sparse_Model():
 
-    def __init__(self, args_inf, test_datasets, wiki_path, valid_dataset):
+    def __init__(self, args, args_inf, test_datasets, wiki_path, valid_dataset):
+        self.args = args
         self.args_inf = args_inf
         self.args_ret = load_config(args_inf.retrieval_config)
         self.wiki = self.wiki_load(wiki_path)
@@ -57,7 +58,13 @@ class Sparse_Model():
 
         # datasets은 test_dataset["validation"]과 같은 구조를 가짐
         df = self.retrieval.retrieve(datasets, topk=self.args_ret.topk)
-        
-        context_dataset = df_to_dataset(df, True)
+        if self.args.do_eval:
+            df = df.drop(columns=['original_context', 'rank'], errors='ignore')
+            df['answers'] = df['answers'].apply(lambda x: {
+                'text': x['text'],
+                'answer_start': [int(start) for start in x['answer_start']]
+            })
+            
+        context_dataset = df_to_dataset(df, self.args.do_predict, self.args.do_eval)
 
         return context_dataset

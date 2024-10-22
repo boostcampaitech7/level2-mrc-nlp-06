@@ -79,11 +79,17 @@ class ExtractiveQA():
         )
         
         training_args = TrainingArguments(**training_args)
-        training_args.do_predict = True
-        
+        if self.args.do_predict:
+            print("Prediction을 수행")
+            training_args.do_predict = True
+        elif self.args.do_eval:
+            print("Evaluation을 수행")
+            training_args.do_eval = True
+
+
         return model_args, data_args, training_args
     
-    def predict(self, datasets, output_dir):
+    def predict(self, datasets, output_dir=None):
         # QA 모델의 경우 Retrieval의 결과가 필요함
         # Datasets : Retrieval 결과에 대한 datasets
 
@@ -219,12 +225,13 @@ class ExtractiveQA():
             print(
                 "No metric can be presented because there is no correct answer given. Job done!"
             )
+            return predictions
 
-        if self.training_args.do_eval:
+        if self.training_args.do_eval: # 여기가 validation의 answer를 못가져감..
             metrics = trainer.evaluate()
             metrics["eval_samples"] = len(eval_dataset)
 
             trainer.log_metrics("test", metrics)
             trainer.save_metrics("test", metrics)
         
-        return predictions
+        
