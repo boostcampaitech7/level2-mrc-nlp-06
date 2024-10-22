@@ -1,13 +1,13 @@
 {
     "encoder_type": "2-stages",
-    "data_path": "../../../data",
-    "data_type": "valid",
+    "data_path": "../data/datasets/v0.0.1",
+    "data_type": "test",
     "bi-encoder": {
-        "model": "../../../sbert-bi-encoder/checkpoint-620",
+        "model": "/data/ephemeral/home/jh/level2-mrc-nlp-06/retrieval/dense/models/bi-encoder/checkpoint-620",
         "topk": 100
     },
     "cr-encoder": {
-        "model": "../../../sbert-cross-encoder",
+        "model": "/data/ephemeral/home/jh/level2-mrc-nlp-06/retrieval/dense/models/cr-encoder",
         "topk": 10
     }
 }

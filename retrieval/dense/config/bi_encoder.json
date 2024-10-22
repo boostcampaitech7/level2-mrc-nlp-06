@@ -1,9 +1,9 @@
 {
     "encoder_type": "bi-encoder",
-    "data_path": "../../../data",
+    "data_path": "../../../data/datasets/v0.0.1",
     "task": "train",
     "model": {
-        "name": "../../../sbert-bi-encoder/checkpoint-620",
+        "name": "snunlp/KR-SBERT-V40K-klueNLI-augSTS",
         "epochs": 5,
         "batch_size": 32,
         "lr": 2e-5,
