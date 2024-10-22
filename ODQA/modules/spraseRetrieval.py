@@ -25,10 +25,16 @@ class Sparse_Model():
         self.wiki = self.wiki_load(wiki_path)
         self.test_datasets = test_datasets
         self.valid_datasets = valid_dataset
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.args_ret.tokenizer_model_name,
-            use_fast = True
-        )
+        if self.args_ret.tokenizer_model_name == "mecab":
+            from konlpy.tag import Mecab
+            self.tokenizer = Mecab().morphs
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.args_ret.tokenizer_model_name,
+                use_fast = True
+            )
+            self.tokenizer = self.tokenizer.tokenize
+        
         self.retrieval = SparseRetrieval(
             embedding_method=self.args_ret.embedding_method,
             tokenizer = self.tokenizer,
@@ -57,7 +63,8 @@ class Sparse_Model():
                 pass
 
         # datasets은 test_dataset["validation"]과 같은 구조를 가짐
-        df = self.retrieval.retrieve(datasets, topk=self.args_ret.topk)
+
+        df = self.retrieval.retrieve(datasets, topk=self.args_ret.topk, save=False, retrieval_save_path="./")
         if self.args.do_eval:
             df = df.drop(columns=['original_context', 'rank'], errors='ignore')
             df['answers'] = df['answers'].apply(lambda x: {
@@ -66,5 +73,5 @@ class Sparse_Model():
             })
             
         context_dataset = df_to_dataset(df, self.args.do_predict, self.args.do_eval)
-
+        
         return context_dataset
