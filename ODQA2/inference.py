@@ -63,7 +63,8 @@ if __name__ == "__main__":
     test_dataset = load_from_disk(retriever_config.eval_data_path)['test']
     logger.info("Evaluation dataset loaded with %d examples.", len(test_dataset))
 
-    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=False)
+    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=True, retrieval_save_path=retriever_config.retrieval_save_path)
+    # result_df.to_csv(os.path.join(config.save_path, 'retrieved.csv'), index=False)
 
     ### MRC
     with open(os.path.join(reader_config.data_args.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
@@ -71,7 +72,7 @@ if __name__ == "__main__":
     result_df['context'] = None
     for idx, doc_ids in enumerate(result_df['document_id']):
         result_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
-    
+
     retrieved_test = Dataset.from_pandas(result_df)
     reader = ExtractiveQA(config.reader)
     reader.predict(retrieved_test, config.save_path)

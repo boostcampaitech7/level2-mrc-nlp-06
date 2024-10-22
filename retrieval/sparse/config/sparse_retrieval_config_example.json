@@ -1,12 +1,12 @@
 {
-    "corpus_data_path": "/data/ephemeral/home/osh/data/v0.0.2/wikipedia_documents.json",
+    "corpus_data_path": "/data/ephemeral/home/osh/datasets/v0.0.2/wikipedia_documents.json",
     "embedding_method": "bm25",
-    "topk": 10,
+    "topk": 20,
     "tokenizer_model_name": "klue/bert-base",
-    "eval_data_path": "/data/ephemeral/home/osh/data/v0.0.2",
+    "eval_data_path": "/data/ephemeral/home/osh/datasets/v0.0.2",
     "eval_metric": [
         "hit",
         "mrr"
     ],
-    "retrieval_save_path": "/data/ephemeral/home/osh/level2-mrc-nlp-06/ODQA2/outputs/retrieval/v2-test.csv"
+    "retrieval_save_path": "/data/ephemeral/home/osh/level2-mrc-nlp-06/ODQA2/outputs/retrieved.csv"
 }
