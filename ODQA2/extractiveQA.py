@@ -22,8 +22,8 @@ from transformers import (
 )
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from reader2.utils.utils_extraction import json_to_Arguments, postprocess_qa_predictions
-from reader2.src.extraction import QuestionAnsweringTrainer
+from reader.utils.utils_mrc import json_to_Arguments, postprocess_qa_predictions
+from reader.extractive.src.trainer_ext import QuestionAnsweringTrainer
 
 class ExtractiveQA():
     def __init__(self, config_path):
