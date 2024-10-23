@@ -8,8 +8,9 @@ from datasets import load_from_disk
 # 데이터 불러오기
 data_path = "/data/ephemeral/home/datasets/v0.0.2"
 data = load_from_disk(data_path)
-train_data = data['train']
 valid_data = data['validation']
+
+valid_data = valid_data.select(range(10))  # for temporal test (to be eliminated)
 
 # 모델 및 토크나이저 로드
 from transformers import AutoTokenizer
@@ -17,6 +18,130 @@ model_name = "meta-llama/Llama-3.1-8B"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.padding_side = "left"
 tokenizer.pad_token = tokenizer.eos_token
+
+tokenizer.chat_template = """{{- bos_token }}
+{%- if custom_tools is defined %}
+    {%- set tools = custom_tools %}
+{%- endif %}
+{%- if not tools_in_user_message is defined %}
+    {%- set tools_in_user_message = true %}
+{%- endif %}
+{%- if not date_string is defined %}
+    {%- if strftime_now is defined %}
+        {%- set date_string = strftime_now("%d %b %Y") %}
+    {%- else %}
+        {%- set date_string = "26 Jul 2024" %}
+    {%- endif %}
+{%- endif %}
+{%- if not tools is defined %}
+    {%- set tools = none %}
+{%- endif %}
+
+{#- This block extracts the system message, so we can slot it into the right place. #}
+{%- if messages[0]['role'] == 'system' %}
+    {%- set system_message = messages[0]['content']|trim %}
+    {%- set messages = messages[1:] %}
+{%- else %}
+    {%- set system_message = "" %}
+{%- endif %}
+
+{#- Find out if there are any images #}
+{% set image_ns = namespace(has_images=false) %}      
+{%- for message in messages %}
+    {%- for content in message['content'] %}
+        {%- if content['type'] == 'image' %}
+            {%- set image_ns.has_images = true %}
+        {%- endif %}
+    {%- endfor %}
+{%- endfor %}
+
+{#- Error out if there are images and system message #}
+{%- if image_ns.has_images and not system_message == "" %}
+    {{- raise_exception("Prompting with images is incompatible with system messages.") }}
+{%- endif %}
+
+{#- System message if there are no images #}
+{%- if not image_ns.has_images %}
+    {{- "<|start_header_id|>system<|end_header_id|>\n\n" }}
+    {%- if tools is not none %}
+        {{- "Environment: ipython\n" }}
+    {%- endif %}
+    {{- "Cutting Knowledge Date: December 2023\n" }}
+    {{- "Today Date: " + date_string + "\n\n" }}
+    {%- if tools is not none and not tools_in_user_message %}
+        {{- "You have access to the following functions. To call a function, please respond with JSON for a function call." }}
+        {{- 'Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}.' }}
+        {{- "Do not use variables.\n\n" }}
+        {%- for t in tools %}
+            {{- t | tojson(indent=4) }}
+            {{- "\n\n" }}
+        {%- endfor %}
+    {%- endif %}
+    {{- system_message }}
+    {{- "<|eot_id|>" }}
+{%- endif %}
+
+{#- Custom tools are passed in a user message with some extra guidance #}
+{%- if tools_in_user_message and not tools is none %}
+    {#- Extract the first user message so we can plug it in here #}
+    {%- if messages | length != 0 %}
+        {%- set first_user_message = messages[0]['content']|trim %}
+        {%- set messages = messages[1:] %}
+    {%- else %}
+        {{- raise_exception("Cannot put tools in the first user message when there's no first user message!") }}
+{%- endif %}
+    {{- '<|start_header_id|>user<|end_header_id|>\n\n' -}}
+    {{- "Given the following functions, please respond with a JSON for a function call " }}
+    {{- "with its proper arguments that best answers the given prompt.\n\n" }}
+    {{- 'Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}.' }}
+    {{- "Do not use variables.\n\n" }}
+    {%- for t in tools %}
+        {{- t | tojson(indent=4) }}
+        {{- "\n\n" }}
+    {%- endfor %}
+    {{- first_user_message + "<|eot_id|>"}}
+{%- endif %}
+
+{%- for message in messages %}
+    {%- if not (message.role == 'ipython' or message.role == 'tool' or 'tool_calls' in message) %}
+    {{- '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n' }}
+        {%- if message['content'] is string %}
+            {{- message['content'] }}
+        {%- else %}
+            {%- for content in message['content'] %}
+                {%- if content['type'] == 'image' %}
+                    {{- '<|image|>' }}
+                {%- elif content['type'] == 'text' %}
+                    {{- content['text'] }}
+                {%- endif %}
+            {%- endfor %}
+        {%- endif %}
+        {{- '<|eot_id|>' }}
+    {%- elif 'tool_calls' in message %}
+        {%- if not message.tool_calls|length == 1 %}
+            {{- raise_exception("This model only supports single tool-calls at once!") }}
+        {%- endif %}
+        {%- set tool_call = message.tool_calls[0].function %}
+        {{- '<|start_header_id|>assistant<|end_header_id|>\n\n' -}}
+        {{- '{"name": "' + tool_call.name + '", ' }}
+        {{- '"parameters": ' }}
+        {{- tool_call.arguments | tojson }}
+        {{- "}" }}
+        {{- "<|eot_id|>" }}
+    {%- elif message.role == "tool" or message.role == "ipython" %}
+        {{- "<|start_header_id|>ipython<|end_header_id|>\n\n" }}
+        {%- if message.content is mapping or message.content is iterable %}
+            {{- message.content | tojson }}
+        {%- else %}
+            {{- message.content }}
+        {%- endif %}
+        {{- "<|eot_id|>" }}
+    {%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+    {{- '<|start_header_id|>assistant<|end_header_id|>\n\n' }}
+{%- endif %}"""
+
 
 # Llama conversation format으로 데이터 변환 
 def convert_squad_sample_to_llama_conversation(sample):
@@ -53,7 +178,6 @@ def convert_squad_sample_to_llama_conversation(sample):
     sample_conversation = tokenizer.apply_chat_template(messages, tokenize=False)
     return {"text": sample_conversation, "messages": messages, "answer": answer}
 
-conversation_training_samples = train_data.map(convert_squad_sample_to_llama_conversation)
 conversation_validation_samples = valid_data.map(convert_squad_sample_to_llama_conversation)
 
 
@@ -64,11 +188,7 @@ conversation_validation_samples = valid_data.map(convert_squad_sample_to_llama_c
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
 import torch
 final_model_path = "./model/final_model"
-model_name = "meta-llama/Llama-3.1-8B"
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.pad_token = tokenizer.eos_token
-tokenizer.padding_side = 'left'
 
 # first we'll load in the base model
 # to help save on gpu space and run this a bit faster we'll load the model in 4bit
@@ -104,7 +224,7 @@ model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
 from evaluate import load
 
 # there are several bert models we can use as a part of bert score
-bert_model = "klue/bert-base"
+bert_model = "distilbert-base-uncased"
 bertscore = load("bertscore")
 
 exact_match_metric = load("exact_match")
@@ -141,7 +261,11 @@ conversation_validation_samples = conversation_validation_samples.map(get_base_a
 
 # calculate the scores for the base model
 base_predictions = conversation_validation_samples['base_prediction']
+print(base_predictions)
+
 answers = conversation_validation_samples['answer']
+print(answers)
+
 base_validation_bert_score = bertscore.compute(predictions=base_predictions, references=answers, lang="en", model_type=bert_model, device="cuda:0")
 baseline_exact_match_score = exact_match_metric.compute(predictions=base_predictions, references=answers)
 baseline_averages = {
