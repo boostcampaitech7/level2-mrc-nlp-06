@@ -4,6 +4,6 @@
     "chat_template_path": "/data/ephemeral/home/minji/reader/abstractive/src/llama_chat_template.txt",
     "output_dir": "/data/ephemeral/home/minji/models/outputs",
     "bnb_4bit_quant_type": "nf4",
-    "num_train_epochs": 3,
+    "num_train_epochs": 1,
     "bert_model": "distilbert-base-uncased"
 }

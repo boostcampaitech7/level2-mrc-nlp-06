@@ -8,6 +8,7 @@ from transformers import AutoTokenizer
 from datasets import load_from_disk, Dataset
 from extractiveQA import ExtractiveQA
 from konlpy.tag import Mecab
+from llamaQA import LlamaQA
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from retrieval.sparse.src.sparse_retrieval import SparseRetrieval
@@ -80,5 +81,6 @@ if __name__ == "__main__":
         result_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
 
     retrieved_test = Dataset.from_pandas(result_df)
-    reader = ExtractiveQA(config.reader)
+    # reader = ExtractiveQA(config.reader)
+    reader = LlamaQA(config.reader)
     reader.predict(retrieved_test, config.save_path)

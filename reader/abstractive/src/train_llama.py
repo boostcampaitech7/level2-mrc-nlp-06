@@ -13,148 +13,38 @@
 
 # Data Preparation ------------------------------------------
 
+import sys
+import logging
+import json
+from box import Box
+import argparse
 from datasets import load_from_disk
-
-# 데이터 불러오기
-data_path = "/data/ephemeral/home/datasets/v0.0.2"
-data = load_from_disk(data_path)
-train_data = data['train']
-valid_data = data['validation']
-
-# 모델 및 토크나이저 로드
-from transformers import AutoTokenizer
-model_name = "meta-llama/Llama-3.1-8B"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.padding_side = "left"
-tokenizer.pad_token = tokenizer.eos_token
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments, pipeline
+from peft import prepare_model_for_kbit_training, LoraConfig
+from trl import SFTTrainer
+from evaluate import load
+import torch
+import gc
 
 
-tokenizer.chat_template = """{{- bos_token }}
-{%- if custom_tools is defined %}
-    {%- set tools = custom_tools %}
-{%- endif %}
-{%- if not tools_in_user_message is defined %}
-    {%- set tools_in_user_message = true %}
-{%- endif %}
-{%- if not date_string is defined %}
-    {%- if strftime_now is defined %}
-        {%- set date_string = strftime_now("%d %b %Y") %}
-    {%- else %}
-        {%- set date_string = "26 Jul 2024" %}
-    {%- endif %}
-{%- endif %}
-{%- if not tools is defined %}
-    {%- set tools = none %}
-{%- endif %}
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s -    %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
-{#- This block extracts the system message, so we can slot it into the right place. #}
-{%- if messages[0]['role'] == 'system' %}
-    {%- set system_message = messages[0]['content']|trim %}
-    {%- set messages = messages[1:] %}
-{%- else %}
-    {%- set system_message = "" %}
-{%- endif %}
 
-{#- Find out if there are any images #}
-{% set image_ns = namespace(has_images=false) %}      
-{%- for message in messages %}
-    {%- for content in message['content'] %}
-        {%- if content['type'] == 'image' %}
-            {%- set image_ns.has_images = true %}
-        {%- endif %}
-    {%- endfor %}
-{%- endfor %}
-
-{#- Error out if there are images and system message #}
-{%- if image_ns.has_images and not system_message == "" %}
-    {{- raise_exception("Prompting with images is incompatible with system messages.") }}
-{%- endif %}
-
-{#- System message if there are no images #}
-{%- if not image_ns.has_images %}
-    {{- "<|start_header_id|>system<|end_header_id|>\n\n" }}
-    {%- if tools is not none %}
-        {{- "Environment: ipython\n" }}
-    {%- endif %}
-    {{- "Cutting Knowledge Date: December 2023\n" }}
-    {{- "Today Date: " + date_string + "\n\n" }}
-    {%- if tools is not none and not tools_in_user_message %}
-        {{- "You have access to the following functions. To call a function, please respond with JSON for a function call." }}
-        {{- 'Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}.' }}
-        {{- "Do not use variables.\n\n" }}
-        {%- for t in tools %}
-            {{- t | tojson(indent=4) }}
-            {{- "\n\n" }}
-        {%- endfor %}
-    {%- endif %}
-    {{- system_message }}
-    {{- "<|eot_id|>" }}
-{%- endif %}
-
-{#- Custom tools are passed in a user message with some extra guidance #}
-{%- if tools_in_user_message and not tools is none %}
-    {#- Extract the first user message so we can plug it in here #}
-    {%- if messages | length != 0 %}
-        {%- set first_user_message = messages[0]['content']|trim %}
-        {%- set messages = messages[1:] %}
-    {%- else %}
-        {{- raise_exception("Cannot put tools in the first user message when there's no first user message!") }}
-{%- endif %}
-    {{- '<|start_header_id|>user<|end_header_id|>\n\n' -}}
-    {{- "Given the following functions, please respond with a JSON for a function call " }}
-    {{- "with its proper arguments that best answers the given prompt.\n\n" }}
-    {{- 'Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}.' }}
-    {{- "Do not use variables.\n\n" }}
-    {%- for t in tools %}
-        {{- t | tojson(indent=4) }}
-        {{- "\n\n" }}
-    {%- endfor %}
-    {{- first_user_message + "<|eot_id|>"}}
-{%- endif %}
-
-{%- for message in messages %}
-    {%- if not (message.role == 'ipython' or message.role == 'tool' or 'tool_calls' in message) %}
-    {{- '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n' }}
-        {%- if message['content'] is string %}
-            {{- message['content'] }}
-        {%- else %}
-            {%- for content in message['content'] %}
-                {%- if content['type'] == 'image' %}
-                    {{- '<|image|>' }}
-                {%- elif content['type'] == 'text' %}
-                    {{- content['text'] }}
-                {%- endif %}
-            {%- endfor %}
-        {%- endif %}
-        {{- '<|eot_id|>' }}
-    {%- elif 'tool_calls' in message %}
-        {%- if not message.tool_calls|length == 1 %}
-            {{- raise_exception("This model only supports single tool-calls at once!") }}
-        {%- endif %}
-        {%- set tool_call = message.tool_calls[0].function %}
-        {{- '<|start_header_id|>assistant<|end_header_id|>\n\n' -}}
-        {{- '{"name": "' + tool_call.name + '", ' }}
-        {{- '"parameters": ' }}
-        {{- tool_call.arguments | tojson }}
-        {{- "}" }}
-        {{- "<|eot_id|>" }}
-    {%- elif message.role == "tool" or message.role == "ipython" %}
-        {{- "<|start_header_id|>ipython<|end_header_id|>\n\n" }}
-        {%- if message.content is mapping or message.content is iterable %}
-            {{- message.content | tojson }}
-        {%- else %}
-            {{- message.content }}
-        {%- endif %}
-        {{- "<|eot_id|>" }}
-    {%- endif %}
-{%- endfor %}
-{%- if add_generation_prompt %}
-    {{- '<|start_header_id|>assistant<|end_header_id|>\n\n' }}
-{%- endif %}"""
-
+# 주어진 경로에서 JSON 형식의 설정 파일을 로드하여 반환
+def load_config(config_path: str):
+    with open(config_path, "r") as f:
+        config = json.load(f)
+        config = Box(config)
+    return config
 
 # Llama conversation format으로 데이터 변환 
-def convert_squad_sample_to_llama_conversation(sample):
+def convert_squad_sample_to_llama_conversation(sample, tokenizer):
     # get the question and context for this sample
     question = sample['question']
     context = sample['context']
@@ -187,118 +77,229 @@ def convert_squad_sample_to_llama_conversation(sample):
     sample_conversation = tokenizer.apply_chat_template(messages, tokenize=False)
     return {"text": sample_conversation, "messages": messages, "answer": answer}
 
-conversation_training_samples = train_data.map(convert_squad_sample_to_llama_conversation)
-conversation_validation_samples = valid_data.map(convert_squad_sample_to_llama_conversation)
+
+# Helper function that will take in a pipeline loaded with our llm for question answer
+# and a list of samples to run inference on, it will return just the responses for each sample
+# def get_bulk_predictions(pipe, samples):
+#     responses = pipe(samples, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
+#     responses = [i[0]['generated_text'][-1]['content'] for i in responses]
+#     return responses
+
+# helper function that will take in a list of samples and run inference for both
+# our tuned and base model and return the results
+def get_base_and_tuned_bulk_predictions(pipe, samples, model):
+    bulk_messages = [i[:-1] for i in samples['messages']]
+
+    # first we enable the adapters in our model, so that inference with our pipeline
+    # will be influenced by our trained weights.
+    # then get the responses for our tuned version of the model.
+    # model.enable_adapters()  # 추가 학습된 가중치 이용해 인퍼런스 (<-> 기본 모델 사용: disable_adapters)
+    responses = pipe(bulk_messages, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
+    responses = [i[0]['generated_text'][-1]['content'] for i in responses]
+
+    # now return the base model predictions and the tuned model predictions
+    return {"predicted_answer": responses}
 
 
-# Model Preparation Preparation ------------------------------------------
 
-# load the base model with 4-bit precision to help save on the gpu overhead
-from transformers import AutoModelForCausalLM, BitsAndBytesConfig
-import torch
+def main():
+    
+    # 기본 세팅 -----------------------------------------------------------------
 
-# load the base model with 4-bit precision to help save on the gpu overhead.
-# setup our config for the LoRA weights
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type='nf4',  ###TODO: 다른 옵션 테스트 
-    bnb_4bit_compute_dtype=torch.float16,
-    bnb_4bit_use_double_quant=True
-)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    quantization_config = bnb_config,
-    device_map="auto"
-)
-model.config.pad_token_id = tokenizer.pad_token_id
+    # Load Arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True, \
+                        help="config 폴더에 있는 json 파일을 로드하세요", \
+                        default="/data/ephemeral/home/minji/reader/config/llama_config.json")
+    config = parser.parse_args()
+    args = load_config(config.config)
+
+    # 모델, 데이터 정보 출력
+    logger.info(f"model is from {args.model_name}")
+    logger.info(f"data is from {args.data_path}")
+
+    # 데이터 불러오기
+    datasets = load_from_disk(args.data_path)
+    logger.info(datasets)
+    train_dataset = datasets['train']
+    eval_dataset = datasets['validation']
+
+    train_dataset = train_dataset.select(range(20))
+    eval_dataset = eval_dataset.select(range(20))
+
+    with open(args.chat_template_path, 'r') as file:
+        chat_template = file.read()
+    
+    # 모델 및 토크나이저 로드
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer.padding_side = "left"
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.chat_template = chat_template
+
+    # Llama 학습을 위한 형태로 데이터 변환
+    conversation_training_samples = train_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer))
+    conversation_validation_samples = eval_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer))
 
 
-from peft import prepare_model_for_kbit_training
-model = prepare_model_for_kbit_training(model)
-model.config.pad_token_id = tokenizer.pad_token_id
-model.config.use_cache = False   # 학습 중이고, output이 변경될 것으로 예상되므로 
+    # Model Preparation Preparation ------------------------------------------
+
+    # load the base model with 4-bit precision to help save on the gpu overhead.
+    # setup our config for the LoRA weights
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type=args.bnb_4bit_quant_type,  ###TODO: 다른 옵션 테스트 
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        quantization_config = bnb_config,
+        device_map="auto"
+    )
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model = prepare_model_for_kbit_training(model)
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.use_cache = False   # 학습 중이고, output이 변경될 것으로 예상되므로 
+
+    # PEFT config 정의
+    rank = 128
+    alpha = rank*2
+    peft_config = LoraConfig(
+        r=rank,
+        lora_alpha=alpha,
+        lora_dropout=0.05, # dropout for the lora layers while training, to avoid overfitting
+        bias="none",
+        task_type="CAUSAL_LM",
+        # the target modules defines what types of layers to add lora adapters too, so in the network
+        # any model that have a name in this list will have a lora adapter added to it,
+        target_modules=['k_proj', 'q_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj']
+    )
+
+    # Supervised Training -----------------------------------------------------
+
+    # Loss function은 여기에서 정의되지 않고, 허깅페이스 모델에 대한 파라미터로서 저장되어 있음
+    # Llama의 경우 loss function은 cross entropy loss로 적용됨
+
+    # first define some training arguments
+    training_arguments = TrainingArguments(
+        output_dir=args.output_dir+"/checkpoints",
+        optim='paged_adamw_32bit', #specify what optimizer we wwant to use, in this case a 8bit version of adamw with pagination.
+        per_device_train_batch_size=8, # define the number of samples per training batch
+        gradient_accumulation_steps=4, # define how many steps to accumulate gradients,
+        log_level='debug',
+        evaluation_strategy = "epoch",
+        save_strategy='epoch', # we'll save a checkpoint every epoch
+        logging_steps=8,
+        eval_steps=8,
+        learning_rate=1e-4, # for llm training we want a fairly high learning rate, 1e-4 is a good starting point but it's worth it to play around with this value
+        fp16=True,
+        num_train_epochs=args.num_train_epochs,
+        warmup_ratio=0.1,
+        load_best_model_at_end = True,
+        overwrite_output_dir = True,
+        lr_scheduler_type='linear',# and set our learning rate decay
+    )
+
+    # now that we have our arguments, we'll use that to create our trainer,
+    # passing in the model, dataset, peft config, tokenizer, etc
+    trainer = SFTTrainer(
+        model=model,
+        train_dataset=conversation_training_samples,
+        eval_dataset=conversation_validation_samples,
+        peft_config=peft_config,
+        dataset_text_field='text', # datasets always has samples in a dictionary, so we need to specify what key to reference when training
+        max_seq_length=512, # specify how many tokens to generate per training, this is just so it doesn't generate for forever especially for shorter samples
+        tokenizer=tokenizer,
+        args=training_arguments
+    )
+    trainer.model.print_trainable_parameters()
+
+    # 학습 및 학습된 weight 저장
+    trainer.train()
+    trainer.save_model(args.output_dir)  # adapter weight만 학습했으므로 이 adapter만 저장됨
+    
+    # move the model to the cpu and then delete the model, tokenizer and trainer objects
+    model.cpu()
+    del model, tokenizer, trainer
+    # We'll also call python to garbage collect any resources that might
+    # still be hanging around, and we'll clear the cuda cache.
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
-# PEFT config 정의
-from peft import LoraConfig
-# rank defines the rank of the adapter matrix,
-# the higher the rank, the more complex the task it's trying to learn
-rank = 128
+    # Evaluation --------------------------------------------------------------
 
-# the alpha is a scaling factor hyper parameter, basically controls how much our
-# adapter will influence the models output, the higher this value
-# the more our adapter will overpower the original model weights.
-# there is a lot of advice out there for what the alpha value should be
-# keeping the alpha at around 2x of what the rank is works for this notebook
-alpha = rank*2
-peft_config = LoraConfig(
-    r=rank,
-    lora_alpha=alpha,
-    lora_dropout=0.05, # dropout for the lora layers while training, to avoid overfitting
-    bias="none",
-    task_type="CAUSAL_LM",
-    # the target modules defines what types of layers to add lora adapters too, so in the network
-    # any model that have a name in this list will have a lora adapter added to it,
-    target_modules=['k_proj', 'q_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj']
-)
+#     # reload tokenizer 
+#     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+#     tokenizer.padding_side = "left"
+#     tokenizer.pad_token = tokenizer.eos_token
+#     tokenizer.chat_template = chat_template
 
-# Training ------------------------------------------
-# supervised training
+#     # load the base model
+#     bnb_config = BitsAndBytesConfig(
+#         load_in_4bit=True,
+#         bnb_4bit_quant_type=args.bnb_4bit_quant_type,  ###TODO: 다른 옵션 테스트 
+#         bnb_4bit_compute_dtype=torch.float16,
+#         bnb_4bit_use_double_quant=True
+#     )
+#     model = AutoModelForCausalLM.from_pretrained(
+#         args.model_name,
+#         quantization_config = bnb_config,
+#         device_map="auto"
+#     )
 
-from transformers import TrainingArguments
-from trl import SFTTrainer
+#     # add trained adapter to the pre-trained llama model
+#     model.load_adapter(args.output_dir, adapter_name="adapter")
+#     model.enable_adapters() 
 
-model_checkpoint_path = "./model/checkpoints"
+#     model.config.pad_token_id = tokenizer.pad_token_id
+#     model.config.use_cache = False
 
-# an important note is that the loss function isn't defined here,
-# it's instead stored as a model parameter for models in hf,
-# in the case of llama it is cross entropy loss
+#     # text-generation을 위해 huggingface pipeline으로 모델 감싸기
+#     model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
-# first define some training arguments
-training_arguments = TrainingArguments(
-    output_dir=model_checkpoint_path,
-    optim='paged_adamw_32bit', #specify what optimizer we wwant to use, in this case a 8bit version of adamw with pagination.
-    per_device_train_batch_size=8, # define the number of samples per training batch
-    gradient_accumulation_steps=4, # define how many steps to accumulate gradients,
-    log_level='debug',
-    evaluation_strategy = "epoch",
-    save_strategy='epoch', # we'll save a checkpoint every epoch
-    logging_steps=8,
-    eval_steps=8,
-    learning_rate=1e-4, # for llm training we want a fairly high learning rate, 1e-4 is a good starting point but it's worth it to play around with this value
-    fp16=True,
-    num_train_epochs=1,
-    warmup_ratio=0.1,
-    load_best_model_at_end = True,
-    overwrite_output_dir = True,
-    lr_scheduler_type='linear',# and set our learning rate decay
-)
+#     # inference on validation set
+#     conversation_validation_samples = conversation_validation_samples.map(lambda samples: get_base_and_tuned_bulk_predictions(pipe=model_pipe, samples=samples, model=model), batched=True, batch_size=20)
 
-# now that we have our arguments, we'll use that to create our trainer,
-# passing in the model, dataset, peft config, tokenizer, ect
-trainer = SFTTrainer(
-    model=model,
-    train_dataset=conversation_training_samples,
-    eval_dataset=conversation_validation_samples,
-    peft_config=peft_config,
-    dataset_text_field='text', # datasets always has samples in a dictionary, so we need to specify what key to reference when training
-    max_seq_length=64, # specify how many tokens to generate per training, this is just so it doesn't generate for forever especially for shorter samples
-    tokenizer=tokenizer,
-    args=training_arguments
-)
+#     # save the result
+#     result_dict = {}  # id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
+#     for sample in conversation_validation_samples:
+#         sample_id = sample['id']
+#         answer = sample['answer']
+#         predicted_answer = sample['predicted_answer']
+        
+#         result_dict[sample_id] = {
+#             'answer': answer,
+#             'predicted_answer': predicted_answer
+#         }
 
-trainer.model.print_trainable_parameters()
+#     output_file = args.output_dir + "/predictions.json"
+#     with open(output_file, "w", encoding="utf-8") as f:
+#         json.dump(result_dict, f, ensure_ascii=False, indent=4)
 
-# 학습 시작 전, validation set에 대해 어느 정도의 성능 보이는지 확인
-initial_eval_values = trainer.evaluate()
-print(initial_eval_values)
-initial_eval_loss = initial_eval_values['eval_loss']
+#     logger.info(f"Data saved to {output_file}")
 
-# 학습!!!!!!
-trainer.train()
 
-# saving the final model weights
-# adapter weight만 학습했으므로 이 adapter만 저장됨
-final_model_path = "./model/final_model"
-trainer.save_model(final_model_path)
-torch.cuda.empty_cache()
+#     # load metrics
+#     bertscore = load("bertscore")
+#     em_f1_score = load("squad")
+
+#     # score calculation
+#     bert_predictions = conversation_validation_samples['predicted_answer']
+#     bert_references = conversation_validation_samples['answer']
+
+#     ex_predictions = [{'id': sample['id'], 'prediction_text': sample['predicted_answer']} for sample in conversation_validation_samples]
+#     ex_references = [{'id': sample['id'], 'answers': [{'text': sample['answers']['text'][0], 'answer_start': sample['answers']['answer_start'][0]}]} for sample in conversation_validation_samples]
+
+#     trained_validation_bert_score = bertscore.compute(predictions=bert_predictions, references=bert_references, lang="kr", model_type=args.bert_model, device="cuda:0")
+#     tuned_exact_match_score = em_f1_score.compute(predictions=ex_predictions, references=ex_references)
+#     tuned_averages = {
+#         key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
+#     }
+#     tuned_averages['exact_match'] = tuned_exact_match_score['exact_match']
+#     tuned_averages['squad_f1'] = tuned_exact_match_score['f1']
+#     logger.info(tuned_averages)
+
+
+# if __name__ == "__main__":
+# 	main()

@@ -1,0 +1,5 @@
+{
+    "reader": "/data/ephemeral/home/minji/reader/abstractive/config/llama_config.json",
+    "retriever": "/data/ephemeral/home/minji/retrieval/sparse/config/config_bm25.json",
+    "save_path": "/data/ephemeral/home/minji/ODQA2/outputs"
+}
