@@ -22,7 +22,7 @@ class Sparse_Model():
         self.args = args
         self.args_inf = args_inf
         self.args_ret = load_config(args_inf.retrieval_config)
-        self.wiki = self.wiki_load(wiki_path)
+        self.wiki, self.ids = self.wiki_load(wiki_path)
         self.test_datasets = test_datasets
         self.valid_datasets = valid_dataset
         if self.args_ret.tokenizer_model_name == "mecab":
@@ -38,7 +38,8 @@ class Sparse_Model():
         self.retrieval = SparseRetrieval(
             embedding_method=self.args_ret.embedding_method,
             tokenizer = self.tokenizer,
-            contexts = self.wiki
+            contexts = self.wiki,
+            document_ids=self.ids
         )
 
     def wiki_load(self, wiki_path):
@@ -47,7 +48,8 @@ class Sparse_Model():
         wiki_df = pd.DataFrame(wiki.values())
         wiki_unique_df = wiki_df.drop_duplicates(subset=["text"], keep="first")
         contexts = wiki_unique_df["text"].tolist()  # unique text 추출
-        return contexts
+        ids = wiki_unique_df["document_id"].tolist()
+        return contexts, ids
     
     def get_contexts(self, datasets):
 
@@ -66,7 +68,7 @@ class Sparse_Model():
 
         df = self.retrieval.retrieve(datasets, topk=self.args_ret.topk, save=False, retrieval_save_path="./")
         if self.args.do_eval:
-            df = df.drop(columns=['original_context', 'rank'], errors='ignore')
+            df = df.drop(columns=['original_context', 'rank', 'document_id'], errors='ignore')
             df['answers'] = df['answers'].apply(lambda x: {
                 'text': x['text'],
                 'answer_start': [int(start) for start in x['answer_start']]

@@ -26,11 +26,12 @@ from pymilvus.model.sparse import SpladeEmbeddingFunction
 
 
 # 2단계 상위 경로를 시스템 경로에 추가
-print(os.path.join(os.getcwd(),"retrieval","sparse"))
-sys.path.append(os.path.join(os.getcwd(),"retrieval","sparse"))
+# print(os.path.join(os.getcwd(),"retrieval","sparse"))
+# sys.path.append(os.path.join(os.getcwd(),"retrieval","sparse"))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils_sparse_retrieval import timer, hit, mrr
-# from utils.utils_sparse_retrieval import timer, hit, mrr
+# from utils_sparse_retrieval import timer, hit, mrr
+from utils.utils_sparse_retrieval import timer, hit, mrr
 
 # logger 지정
 logging.basicConfig(
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 # TF-IDF, BM25 알고리즘으로 문서 검색
 class SparseRetrieval: 
 
-    def __init__(self, embedding_method: str, tokenizer, contexts) -> NoReturn:
+    def __init__(self, embedding_method: str, tokenizer, contexts, document_ids) -> NoReturn:
         """
         문서 검색을 위한 Sparse Retrieval 클래스. 
         TF-IDF 및 BM25 알고리즘을 사용하여 문서 임베딩과 검색을 수행한다.
@@ -58,10 +59,10 @@ class SparseRetrieval:
         self.embedding_method = embedding_method
         self.tokenizer = tokenizer
         self.contexts = contexts
-        self.tfidfv = None       # TF-IDF 벡터화기
-        self.p_embedding = None  # TF-IDF 임베딩 결과
-        self.bm25 = None         # BM25 모델
-
+        self.document_ids = document_ids
+        self.tfidfv = None
+        self.p_embedding = None
+        self.bm25 = None
 
     def get_sparse_embedding_tfidf(self) -> NoReturn:
         """
@@ -197,11 +198,14 @@ class SparseRetrieval:
             for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
                 # 쿼리와 유사한 wiki 문서 리스트
                 retrieved_contexts = [self.contexts[pid] for pid in doc_indices[idx]]
+                retrieved_document_ids = [self.document_ids[pid] for pid in doc_indices[idx]]
 
                 # retrieval 결과 딕셔너리
                 retrieved_dict = {
                     "question": example["question"],         # 쿼리
-                    "id": example["id"],                     # id
+                    "id": example["id"],
+                    "document_id": retrieved_document_ids,
+                    # id
                     "context": " ".join(retrieved_contexts), # 검색된 context 이어 붙이기
                 }
 
