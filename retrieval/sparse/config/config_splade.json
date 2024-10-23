@@ -1,0 +1,11 @@
+{
+    "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
+    "embedding_method": "splade",
+    "bgem3_type": "dense",
+    "dense_metric_type": "IP",
+    "embedding_model_name": "naver/splade-cocondenser-ensembledistil",
+    "collection_name": "collection_splade_naver",
+    "topk": 10,
+    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1",
+    "eval_metric": ["hit", "mrr"]
+}

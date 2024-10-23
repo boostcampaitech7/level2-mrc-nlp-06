@@ -7,6 +7,7 @@ import os, sys, json
 from transformers import AutoTokenizer
 from datasets import load_from_disk, Dataset
 from extractiveQA import ExtractiveQA
+from konlpy.tag import Mecab
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from retrieval.sparse.src.sparse_retrieval import SparseRetrieval
@@ -49,7 +50,12 @@ if __name__ == "__main__":
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
     document_ids = wiki_unique_df["document_id"].tolist()
 
-    tokenizer = AutoTokenizer.from_pretrained(retriever_config.tokenizer_model_name, use_fast=True)
+    if retriever_config.embedding_method in ['tfidf', 'bm25']:
+        if retriever_config.tokenizer_model_name == "mecab":
+            tokenizer = Mecab().morphs
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(retriever_config.tokenizer_model_name, use_fast=True)
+            tokenizer = tokenizer.tokenize
     retriever = SparseRetrieval(embedding_method=retriever_config.embedding_method,
                                 tokenizer=tokenizer,
                                 contexts=contexts,
@@ -63,7 +69,8 @@ if __name__ == "__main__":
     test_dataset = load_from_disk(retriever_config.eval_data_path)['test']
     logger.info("Evaluation dataset loaded with %d examples.", len(test_dataset))
 
-    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=False)
+    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=True, retrieval_save_path=config.save_path)
+    # result_df.to_csv(os.path.join(config.save_path, 'retrieved.csv'), index=False)
 
     ### MRC
     with open(os.path.join(reader_config.data_args.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
@@ -71,7 +78,7 @@ if __name__ == "__main__":
     result_df['context'] = None
     for idx, doc_ids in enumerate(result_df['document_id']):
         result_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
-    
+
     retrieved_test = Dataset.from_pandas(result_df)
     reader = ExtractiveQA(config.reader)
     reader.predict(retrieved_test, config.save_path)

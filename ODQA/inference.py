@@ -7,11 +7,15 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 import logging
 import sys
 import os
-sys.path.append('/data/ephemeral/home/jh/level2-mrc-nlp-06/src')
+import json
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Callable, Dict, List, NoReturn, Tuple
 import argparse
-
 import numpy as np
+import pandas as pd
+
+# ========= Hugging Face ========= #
 from datasets import (
     Dataset,
     DatasetDict,
@@ -21,10 +25,6 @@ from datasets import (
     load_from_disk,
     load_metric,
 )
-
-from retrieval.trainer_retrieval import DenseRetrieval
-
-from mrc.trainer_mrc import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -37,336 +37,81 @@ from transformers import (
     set_seed,
 )
 
+# ========= Modules ========= #
+from modules.extractiveQA import ExtractiveQA
+from modules.spraseRetrieval import Sparse_Model
+from modules.denseRetrieval import Dense_Model
+from utils_common import json_to_config, dict_to_json
 
-from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
-from utils.utils_common import dict_to_json
 
 logger = logging.getLogger(__name__)
 
-
-def main(args, model_args, training_args, data_args, datasets):
-    # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
-    # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
-    config = AutoConfig.from_pretrained(
-        model_args.config_name
-        if model_args.config_name
-        else model_args.model_name_or_path,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name
-        else model_args.model_name_or_path,
-        use_fast=True,
-    )
-    if model_args.generation:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config
-        )
-    else:
-        model = AutoModelForQuestionAnswering.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-        )
-
-    # True일 경우 : run passage retrieval
-    if data_args.eval_retrieval:
-        match model_args.retrieval_type:
-            case "sparse":
-                sparse_datasets = run_sparse_retrieval(tokenizer.tokenize, datasets, training_args, data_args)
-            case "dense":
-                # 추후에 output_dir config 설정해주어야함
-                dense_datasets = run_dense_retrieval(model_path="/data/ephemeral/home/jh/level2-mrc-nlp-06/models/dense_retrieval_model",
-                                               datasets=datasets, data_path="../data", topk=5, training_args=training_args)
-                print(dense_datasets)
-            case "hybrid":
-                pass
-            
-    # eval or predict mrc model
-    if training_args.do_eval or training_args.do_predict:
-        # 현재는 테스트를 위해 Dense만 사용하였습니다.
-        if model_args.retrieval_type == "dense":
-            run_mrc(data_args, training_args, model_args, dense_datasets, tokenizer, model)
-
-def run_dense_retrieval(
-    model_path,
-    datasets: DatasetDict,
-    data_path: str,
-    topk: int,
-    training_args: TrainingArguments
-) -> DatasetDict:
+def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_datasets=None):
     
-    # DenseRetrieval 객체 생성, 추후에 model_name은 config로 들어가야할듯, 아니면 model_path로 받을 수 있도록 만들어야함
-    retrieval = DenseRetrieval("klue/roberta-base", pool=True, metric="dot")
+    # Load QA Model
+    match args.qa:
+        case "ext":
+            print("******* Extractive QA Model 선택 *******")
+            QA_model = ExtractiveQA(args, inference_config.qa_config, test_datasets, valid_datasets)
+        case "abs":
+            pass
 
-    wiki_path = os.path.join(data_path, 'wiki_unique.csv')
-    
-    # retrieval.retrieve(test_dataset, int(config.topk), wiki_path, config.train.output_dir)
-    df = retrieval.retrieve(datasets["validation"], topk, wiki_path, model_path)
-    f = None
-    # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
-    if training_args.do_predict:
-        f = Features(
-            {
-                "context": Value(dtype="string", id=None),
-                "id": Value(dtype="string", id=None),
-                "question": Value(dtype="string", id=None),
-            }
-        )
+    # Load Retrieval Model
+    match args.retrieval:
+        case "sparse":
+            print("******* Sparse Retrieval Model 선택 *******")
+            Ret_model = Sparse_Model(args, inference_config, test_datasets, wiki_path, valid_datasets)
+        case "dense":
+            print(("******* Dense (SBERT) Retrieval Model 선택 *******"))
+            Ret_model = Dense_Model(args, inference_config, test_datasets, wiki_path, valid_datasets)
+            pass
+        case "hybrid":
+            pass
 
-    # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
-    elif training_args.do_eval:
-        f = Features(
-            {
-                "answers": Sequence(
-                    feature={
-                        "text": Value(dtype="string", id=None),
-                        "answer_start": Value(dtype="int32", id=None),
-                    },
-                    length=-1,
-                    id=None,
-                ),
-                "context": Value(dtype="string", id=None),
-                "id": Value(dtype="string", id=None),
-                "question": Value(dtype="string", id=None),
-            }
-        )
-    datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
-    return datasets
-    
-def run_sparse_retrieval( # 
-    tokenize_fn: Callable[[str], List[str]],
-    datasets: DatasetDict,
-    training_args: TrainingArguments,
-    data_args,
-    data_path: str = "../data",
-    context_path: str = "wikipedia_documents.json",
-) -> DatasetDict:
+    if args.do_predict:
+        # Inference
+        output_dir = os.path.join(pred_dir, "test") # predictions.json 출력폴더
 
-    # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
+        # 1. Retrieval Model에서 Question에 맞는 Context를 가져옴
+        test_retrieve_datasets = Ret_model.get_contexts(test_datasets)
 
-    if data_args.use_faiss:
-        retriever.build_faiss(num_clusters=data_args.num_clusters)
-        df = retriever.retrieve_faiss(
-            datasets["validation"], topk=data_args.top_k_retrieval
-        )
-    else:
-        df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval)
+        # 2. Reader에 Context를 전달하여 Inference를 수행
+        # Extraction Reader의 경우 postprocess_qa_predictions함수를 수행하면서 자동적으로 Json 저장
+        test_predictions = QA_model.predict(test_retrieve_datasets, output_dir)
 
-    # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
-    if training_args.do_predict:
-        f = Features(
-            {
-                "context": Value(dtype="string", id=None),
-                "id": Value(dtype="string", id=None),
-                "question": Value(dtype="string", id=None),
-            }
-        )
+        # 3. 만약에 Validation도 추가로 Predictions을 뽑고 싶을 때
+        if args.do_valid:
+            output_dir = os.path.join(pred_dir, "validation")
+            valid_retrieve_datasets = Ret_model.get_contexts(valid_datasets)
+            valid_predictions = QA_model.predict(valid_retrieve_datasets, output_dir)
+            dict_to_json(os.path.join(output_dir,"predictions.json"),
+                        os.path.join(output_dir,"prediction_with_ans.json"),
+                        answers)
 
-    # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
-    elif training_args.do_eval:
-        f = Features(
-            {
-                "answers": Sequence(
-                    feature={
-                        "text": Value(dtype="string", id=None),
-                        "answer_start": Value(dtype="int32", id=None),
-                    },
-                    length=-1,
-                    id=None,
-                ),
-                "context": Value(dtype="string", id=None),
-                "id": Value(dtype="string", id=None),
-                "question": Value(dtype="string", id=None),
-            }
-        )
-    datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
-    return datasets
+    elif args.do_eval:
+        output_dir = os.path.join(pred_dir, "eval") 
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
 
-# 현재는 Extraction-MRC, Dense Passage 방식 테스트
-def run_mrc(
-    data_args,
-    training_args: TrainingArguments,
-    model_args,
-    datasets: DatasetDict,
-    tokenizer,
-    model,
-) -> NoReturn:
-
-    # eval 혹은 prediction에서만 사용함
-    column_names = datasets["validation"].column_names
-
-    question_column_name = "question" if "question" in column_names else column_names[0]
-    context_column_name = "context" if "context" in column_names else column_names[1]
-    answer_column_name = "answers" if "answers" in column_names else column_names[2]
-
-    # Padding에 대한 옵션을 설정합니다.
-    # (question|context) 혹은 (context|question)로 세팅 가능합니다.
-    pad_on_right = tokenizer.padding_side == "right"
-
-    # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(
-        data_args, training_args, datasets, tokenizer
-    )
-
-    # Validation preprocessing / 전처리를 진행합니다.
-    def prepare_validation_features(examples):
-        # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
-        # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
-        tokenized_examples = tokenizer(
-            examples[question_column_name if pad_on_right else context_column_name],
-            examples[context_column_name if pad_on_right else question_column_name],
-            truncation="only_second" if pad_on_right else "only_first",
-            max_length=max_seq_length,
-            stride=data_args.doc_stride,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            padding="max_length" if data_args.pad_to_max_length else False,
-        )
-
-        # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
-        sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
-
-        # evaluation을 위해, prediction을 context의 substring으로 변환해야합니다.
-        # corresponding example_id를 유지하고 offset mappings을 저장해야합니다.
-        tokenized_examples["example_id"] = []
-
-        for i in range(len(tokenized_examples["input_ids"])):
-            # sequence id를 설정합니다 (to know what is the context and what is the question).
-            sequence_ids = tokenized_examples.sequence_ids(i)
-            context_index = 1 if pad_on_right else 0
-
-            # 하나의 example이 여러개의 span을 가질 수 있습니다.
-            sample_index = sample_mapping[i]
-            tokenized_examples["example_id"].append(examples["id"][sample_index])
-
-            # context의 일부가 아닌 offset_mapping을 None으로 설정하여 토큰 위치가 컨텍스트의 일부인지 여부를 쉽게 판별할 수 있습니다.
-            tokenized_examples["offset_mapping"][i] = [
-                (o if sequence_ids[k] == context_index else None)
-                for k, o in enumerate(tokenized_examples["offset_mapping"][i])
-            ]
-        return tokenized_examples
-
-    eval_dataset = datasets["validation"]
-
-    # Validation Feature 생성
-    eval_dataset = eval_dataset.map(
-        prepare_validation_features,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-        remove_columns=column_names,
-        load_from_cache_file=not data_args.overwrite_cache,
-    )
-
-    # Data collator
-    # flag가 True이면 이미 max length로 padding된 상태입니다.
-    # 그렇지 않다면 data collator에서 padding을 진행해야합니다.
-    data_collator = DataCollatorWithPadding(
-        tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
-    )
-
-    # Post-processing:
-    def post_processing_function(
-        examples,
-        features,
-        predictions: Tuple[np.ndarray, np.ndarray],
-        training_args: TrainingArguments,
-    ) -> EvalPrediction:
-        # Post-processing: start logits과 end logits을 original context의 정답과 match시킵니다.
-        predictions = postprocess_qa_predictions(
-            examples=examples,
-            features=features,
-            predictions=predictions,
-            max_answer_length=data_args.max_answer_length,
-            output_dir=training_args.output_dir,
-        )
-        # Metric을 구할 수 있도록 Format을 맞춰줍니다.
-        formatted_predictions = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
-        ]
-
-        if training_args.do_predict:
-            return formatted_predictions
-        elif training_args.do_eval:
-            references = [
-                {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in datasets["validation"]
-            ]
-
-            return EvalPrediction(
-                predictions=formatted_predictions, label_ids=references
-            )
-
-    metric = load_metric("squad")
-
-    def compute_metrics(p: EvalPrediction) -> Dict:
-        return metric.compute(predictions=p.predictions, references=p.label_ids)
-
-    print("init trainer...")
-    # Trainer 초기화
-    trainer = QuestionAnsweringTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=None,
-        eval_dataset=eval_dataset,
-        eval_examples=datasets["validation"],
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        post_process_function=post_processing_function,
-        compute_metrics=compute_metrics
-    )
-
-    logger.info("*** Evaluate ***")
-
-    #### eval dataset & eval example - predictions.json 생성됨
-    if training_args.do_predict:
-        predictions = trainer.predict(
-            test_dataset=eval_dataset, test_examples=datasets["validation"]
-        )
-
-        # predictions.json 은 postprocess_qa_predictions() 호출시 이미 저장됩니다.
-        print(
-            "No metric can be presented because there is no correct answer given. Job done!"
-        )
-
-    if training_args.do_eval:
-        metrics = trainer.evaluate()
-        metrics["eval_samples"] = len(eval_dataset)
-
-        trainer.log_metrics("test", metrics)
-        trainer.save_metrics("test", metrics)
-
-
+        valid_retrieve_datasets = Ret_model.get_contexts(valid_datasets)
+        QA_model.predict(valid_retrieve_datasets, output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="config 폴더에 있는 json 파일을 로드하세요", default="./config/reader/base_config.json")
+    parser.add_argument("--config", help="Inference Options 설정", default="./config/base_config.json")
     parser.add_argument("--pred_dir", help="Prediction 폴더 설정", default="./predictions")
-    parser.add_argument("--do_predict", action="store_true", required=True, help="Predict할 경우 활성화")
-    parser.add_argument("--do_eval", action="store_true", help="Eval도 같이 할 경우에 활성화")
-    parser.add_argument("--do_valid", action="store_true", help="Validation 데이터셋에 대해 Prediction을 저장하기 위한 옵션")
+    parser.add_argument("--qa", required=True, help="qa 타입을 설정해주세요. ['abs','ext']")
+    parser.add_argument("--retrieval", required=True, help="retrieval 타입을 설정해주세요. ['sparse','hybrid','dense']")
+    parser.add_argument("--do_valid", action="store_true", help="Validation 데이터셋에 대해 Prediction을 저장하기 위한 옵션", default=False)
+    parser.add_argument("--do_predict", action="store_true", help="Test 데이터셋에 대해 Predictions을 저장하기 위한 옵션, do_eval과 겹치면 안됨", default=False)
+    parser.add_argument("--do_eval", action="store_true", help="Validation 데이터셋에 대해 Evaluate", default=False)
     args = parser.parse_args()
-
-    model_args, data_args, training_args = json_to_Arguments(args.config)
     
-    training_args = TrainingArguments(**training_args)
-    training_args.output_dir = os.path.join(args.pred_dir,"predict")
-    if args.do_predict:
-        training_args.do_predict = True
-
-    if args.do_eval:
-        training_args.do_eval = True
-    
-    # Test Dataset 대해서 Predictions 수행
-    print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.test_dataset_name}")
+    print("=" * 8)
+    print("QA Model type :",args.qa)
+    print("Retrieval Model type :",args.retrieval)
+    print("Validation Predictions Options", args.do_valid)
+    print("=" * 8)
 
     # logging 설정
     logging.basicConfig(
@@ -374,42 +119,31 @@ if __name__ == "__main__":
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
-    logger.info("Training/evaluation parameters %s", training_args)
 
-    # 모델을 초기화하기 전에 난수를 고정합니다.
-    set_seed(training_args.seed)
+    inference_config = json_to_config(args.config)
+    wiki_path = os.path.join(inference_config.datasets,"wikipedia_documents.json")
+    
+    # datasets load
+    
+    datasets = load_from_disk(inference_config.datasets)
+    test_datasets = datasets["test"]
+    
+    if args.do_predict:
+        if args.do_valid:
+            print("Test Dataset Load --------")
+            print(test_datasets)
+            print("validation Dataset Load --------")
+            valid_datasets = datasets["validation"]
+            answers = {data["id"]:data["answers"]["text"][0] for data in valid_datasets}
+            valid_datasets = valid_datasets.remove_columns(["title","context","answers","document_id"])
+            print(valid_datasets)
+            run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir, valid_datasets=valid_datasets)
+        else:
+            test_datasets = datasets["test"]
+            run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir)
+    
+    elif args.do_eval:
+        valid_datasets = datasets["validation"].remove_columns(["title","document_id"])
+        run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir, valid_datasets=valid_datasets)
 
-    datasets = load_from_disk(data_args.test_dataset_name)
-    print(datasets)
     print("******* predict dataset Predictions *******")
-    main(args, model_args, training_args, data_args, datasets)
-
-    if args.do_valid:
-
-        # Validation Dataset 대해서도 Predictions 수행
-        training_args.output_dir = os.path.join(args.pred_dir,"validation")
-
-        # logging 설정
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-            datefmt="%m/%d/%Y %H:%M:%S",
-            handlers=[logging.StreamHandler(sys.stdout)],
-        )
-        # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
-        logger.info("Training/evaluation parameters %s", training_args)
-
-        # 모델을 초기화하기 전에 난수를 고정합니다.
-        set_seed(training_args.seed)
-
-        datasets = load_from_disk(data_args.train_dataset_name)
-        answers = {data["id"]:data["answers"]["text"][0] for data in datasets["validation"]}
-        datasets = datasets.remove_columns(["title","context","answers","document_id","__index_level_0__"])
-        print("******* validation dataset Predictions *******")
-        print(datasets)
-        main(args, model_args, training_args, data_args, datasets)
-
-        # 기존 predictions 불러와서 정답 추가
-        dict_to_json(os.path.join(training_args.output_dir,"predictions.json"),
-                     os.path.join(training_args.output_dir,"prediction_with_ans.json"),
-                     answers)

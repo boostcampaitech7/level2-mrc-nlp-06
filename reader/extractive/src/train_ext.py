@@ -1,6 +1,13 @@
+import logging
+import os
+import sys
+import random
 import numpy as np
-import os, sys, nltk
-import torch, random, logging, argparse
+import torch
+import argparse
+
+print(os.path.join(os.getcwd(),"reader"))
+sys.path.append(os.path.join(os.getcwd(),"reader"))
 
 from typing import NoReturn
 from datasets import DatasetDict, load_from_disk, load_metric
@@ -13,20 +20,20 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
+import nltk
 
-from extraction import QuestionAnsweringTrainer
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from utils.utils_extraction import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from trainer_ext import QuestionAnsweringTrainer
+from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
 from utils.preprocessing import get_train_dataset
 
 seed = 2024
 deterministic = False
 
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
+random.seed(seed) # python random seed 고정
+np.random.seed(seed) # numpy random seed 고정
+torch.manual_seed(seed) # torch random seed 고정
 torch.cuda.manual_seed_all(seed)
-if deterministic:
+if deterministic: # cudnn random seed 고정 - 고정 시 학습 속도가 느려질 수 있습니다. 
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
 
@@ -55,12 +62,12 @@ def main():
         training_args.do_eval=False
 
     print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.data_path}")
+    print(f"data is from {data_args.dataset_name}")
 
     set_seed(training_args.seed)
 
-    train_datasets = load_from_disk(data_args.data_path)['train']
-    valid_datasets = load_from_disk(data_args.data_path)['validation']
+    datasets = load_from_disk(data_args.dataset_name)
+    print(datasets)
 
     config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
@@ -78,26 +85,33 @@ def main():
         config=config,
     )
 
-    print(type(training_args), type(model_args), type(train_datasets), type(tokenizer), type(model))
+
+    print(
+        type(training_args),
+        type(model_args),
+        type(datasets),
+        type(tokenizer),
+        type(model),
+    )    
     print("***** Train Extractive QA *****")
-    run_mrc_extract(data_args, training_args, model_args, train_datasets, valid_datasets, tokenizer, model)
+    training_args.output_dir=str(os.path.join(training_args.output_dir,"Extractive"))
+    run_mrc_extract(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
 def run_mrc_extract(
     data_args: dict,
     training_args: TrainingArguments,
     model_args: dict,
-    train_datasets: DatasetDict,
-    valid_datasets: DatasetDict,
+    datasets: DatasetDict,
     tokenizer,
     model,) -> NoReturn:
 
     # dataset을 전처리합니다.
     # training과 evaluation에서 사용되는 전처리는 아주 조금 다른 형태를 가집니다.
     if training_args.do_train:
-        column_names = train_datasets.column_names
+        column_names = datasets["train"].column_names
     else:
-        column_names = valid_datasets.column_names
+        column_names = datasets["validation"].column_names
 
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]
@@ -109,14 +123,14 @@ def run_mrc_extract(
     pad_on_right = tokenizer.padding_side == "right"
 
     # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(data_args, training_args, train_datasets, tokenizer)
+    last_checkpoint, max_seq_length = check_no_error(data_args, training_args, datasets, tokenizer)
     
     if training_args.do_train:
         if training_args.do_eval:
-            train_dataset, eval_dataset = get_train_dataset(tokenizer, data_args, training_args, train_datasets, valid_datasets, 
+            train_dataset, eval_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
                                                             column_names,qca_names,pad_on_right)
         else:
-            train_dataset = get_train_dataset(tokenizer, data_args, training_args, train_datasets, valid_datasets,
+            train_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
                                                             column_names,qca_names,pad_on_right)
 
     data_collator = DataCollatorWithPadding(
@@ -143,7 +157,7 @@ def run_mrc_extract(
         elif training_args.do_eval:
             references = [
                 {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in valid_datasets
+                for ex in datasets["validation"]
             ]
             return EvalPrediction(
                 predictions=formatted_predictions, label_ids=references
@@ -161,7 +175,7 @@ def run_mrc_extract(
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
-        eval_examples=valid_datasets if training_args.do_eval else None,
+        eval_examples=datasets["validation"] if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
@@ -176,7 +190,7 @@ def run_mrc_extract(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=False)
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
