@@ -171,8 +171,7 @@ def convert_squad_sample_to_llama_conversation(sample):
 
     # now we define an initial model prompt defining the task and giving the model the context passage
     # 프롬프트 한국어로 바꾸면 성능 더 좋아질까?
-    instruction_prompt_template = '''
-    You are a helpful assistant tasked with extracting passages that answer users questions from a given context. Output exact passages word for word that answer the users question. Do not output any other text other than passages in the context passage. Output the minimal amount to answer the question, for example only 2-3 words from the passage. If you cannot find the answer in the context passage output 'The context does not provide an answer...'
+    instruction_prompt_template = '''You are a helpful assistant tasked with extracting passages that answer users questions from a given context. Output exact passages word for word that answer the users question. Do not output any other text other than passages in the context passage. Output the minimal amount to answer the question, for example only 2-3 words from the passage. If you cannot find the answer in the context passage output 'The context does not provide an answer...'
 
     Context: {context}'''
 
@@ -202,7 +201,7 @@ import torch
 # setup our config for the LoRA weights
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_quant_type='nf4',
+    bnb_4bit_quant_type='nf4',  ###TODO: 다른 옵션 테스트 
     bnb_4bit_compute_dtype=torch.float16,
     bnb_4bit_use_double_quant=True
 )
@@ -268,7 +267,7 @@ training_arguments = TrainingArguments(
     eval_steps=8,
     learning_rate=1e-4, # for llm training we want a fairly high learning rate, 1e-4 is a good starting point but it's worth it to play around with this value
     fp16=True,
-    num_train_epochs=3,
+    num_train_epochs=1,
     warmup_ratio=0.1,
     load_best_model_at_end = True,
     overwrite_output_dir = True,
@@ -283,7 +282,7 @@ trainer = SFTTrainer(
     eval_dataset=conversation_validation_samples,
     peft_config=peft_config,
     dataset_text_field='text', # datasets always has samples in a dictionary, so we need to specify what key to reference when training
-    max_seq_length=1024, # specify how many tokens to generate per training, this is just so it doesn't generate for forever especially for shorter samples
+    max_seq_length=64, # specify how many tokens to generate per training, this is just so it doesn't generate for forever especially for shorter samples
     tokenizer=tokenizer,
     args=training_arguments
 )

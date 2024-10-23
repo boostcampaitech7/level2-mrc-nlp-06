@@ -10,8 +10,6 @@ data_path = "/data/ephemeral/home/datasets/v0.0.2"
 data = load_from_disk(data_path)
 valid_data = data['validation']
 
-valid_data = valid_data.select(range(10))  # for temporal test (to be eliminated)
-
 # 모델 및 토크나이저 로드
 from transformers import AutoTokenizer
 model_name = "meta-llama/Llama-3.1-8B"
@@ -161,8 +159,7 @@ def convert_squad_sample_to_llama_conversation(sample):
 
     # now we define an initial model prompt defining the task and giving the model the context passage
     # 프롬프트 한국어로 바꾸면 성능 더 좋아질까?
-    instruction_prompt_template = '''
-    You are a helpful assistant tasked with extracting passages that answer users questions from a given context. Output exact passages word for word that answer the users question. Do not output any other text other than passages in the context passage. Output the minimal amount to answer the question, for example only 2-3 words from the passage. If you cannot find the answer in the context passage output 'The context does not provide an answer...'
+    instruction_prompt_template = '''You are a helpful assistant tasked with extracting passages that answer users questions from a given context. Output exact passages word for word that answer the users question. Do not output any other text other than passages in the context passage. Output the minimal amount to answer the question, for example only 2-3 words from the passage. If you cannot find the answer in the context passage output 'The context does not provide an answer...'
 
     Context: {context}'''
 
@@ -187,7 +184,7 @@ conversation_validation_samples = valid_data.map(convert_squad_sample_to_llama_c
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
 import torch
-final_model_path = "./model/final_model"
+final_model_path = "./model/final_model1"
 
 
 # first we'll load in the base model
@@ -233,7 +230,7 @@ exact_match_metric = load("exact_match")
 # Helper function that will take in a pipeline loaded with our llm for question answer
 # and a list of samples to run inference on, it will return just the responses for each sample
 def get_bulk_predictions(pipe, samples):
-    responses = pipe(samples, max_new_tokens=512, batch_size=len(samples), do_sample=False)
+    responses = pipe(samples, max_new_tokens=64, batch_size=len(samples), do_sample=False, top_p=None)
     responses = [i[0]['generated_text'][-1]['content'] for i in responses]
     return responses
 
@@ -246,43 +243,64 @@ def get_base_and_tuned_bulk_predictions(samples):
     # will be influenced by our trained weights.
     # then get the responses for our tuned version of the model.
     model.enable_adapters()
-    trained_responses = get_bulk_predictions(model_pipe, bulk_messages)
-
-    # next turn off adapters and get the inference using just the base model weights.
-    model.disable_adapters()
-    base_responses = get_bulk_predictions(model_pipe, bulk_messages)
+    predicted_answer = get_bulk_predictions(model_pipe, bulk_messages)
 
     # now return the base model predictions and the tuned model predictions
-    return {"base_prediction": base_responses, "trained_prediction": trained_responses}
+    return {"predicted_answer": predicted_answer}
 
 # run inference on our validation set
 conversation_validation_samples = conversation_validation_samples.map(get_base_and_tuned_bulk_predictions, batched=True, batch_size=20)
 
 
+
+import json
+
+# id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
+result_dict = {}
+
+# 각 샘플에서 필요한 데이터 추출하여 딕셔너리로 변환
+for sample in conversation_validation_samples:
+    sample_id = sample['id']
+    answer = sample['answer']
+    predicted_answer = sample['predicted_answer']
+    
+    result_dict[sample_id] = {
+        'answer': answer,
+        'predicted_answer': predicted_answer
+    }
+
+# 파일로 저장
+output_file = "predictions.json"
+with open(output_file, "w", encoding="utf-8") as f:
+    json.dump(result_dict, f, ensure_ascii=False, indent=4)
+
+print(f"Data saved to {output_file}")
+
 # calculate the scores for the base model
-base_predictions = conversation_validation_samples['base_prediction']
-print(base_predictions)
+# base_predictions = conversation_validation_samples['predicted_answer']
+# answers = conversation_validation_samples['answer']
+# print(answers)
 
-answers = conversation_validation_samples['answer']
-print(answers)
+# base_validation_bert_score = bertscore.compute(predictions=base_predictions, references=answers, lang="en", model_type=bert_model, device="cuda:0")
+# baseline_exact_match_score = exact_match_metric.compute(predictions=base_predictions, references=answers)
+# baseline_averages = {
+#     key: sum(base_validation_bert_score[key])/len(base_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
+# }
+# baseline_averages['exact_match'] = sum(baseline_exact_match_score.values())/len(baseline_exact_match_score.values())
 
-base_validation_bert_score = bertscore.compute(predictions=base_predictions, references=answers, lang="en", model_type=bert_model, device="cuda:0")
-baseline_exact_match_score = exact_match_metric.compute(predictions=base_predictions, references=answers)
-baseline_averages = {
-    key: sum(base_validation_bert_score[key])/len(base_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
-}
-baseline_averages['exact_match'] = sum(baseline_exact_match_score.values())/len(baseline_exact_match_score.values())
+# print(baseline_averages)
 
-print(baseline_averages)
+# # do the same calculation for the tuned model
+# trained_predictions = conversation_validation_samples['trained_prediction']
+# answers = conversation_validation_samples['answer']
+# trained_validation_bert_score = bertscore.compute(predictions=trained_predictions, references=answers, lang="en", model_type=bert_model, device="cuda:0")
+# tuned_exact_match_score = exact_match_metric.compute(predictions=trained_predictions, references=answers)
+# tuned_averages = {
+#     key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
+# }
 
-# do the same calculation for the tuned model
-trained_predictions = conversation_validation_samples['trained_prediction']
-answers = conversation_validation_samples['answer']
-trained_validation_bert_score = bertscore.compute(predictions=trained_predictions, references=answers, lang="en", model_type=bert_model, device="cuda:0")
-tuned_exact_match_score = exact_match_metric.compute(predictions=trained_predictions, references=answers)
-tuned_averages = {
-    key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
-}
 
-tuned_averages['exact_match'] = sum(tuned_exact_match_score.values())/len(tuned_exact_match_score.values())
-print(tuned_averages)
+
+# tuned_averages['exact_match'] = sum(tuned_exact_match_score.values())/len(tuned_exact_match_score.values())
+# print(tuned_averages)
+
