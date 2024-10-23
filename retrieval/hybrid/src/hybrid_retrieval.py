@@ -545,6 +545,9 @@ class HybridRetrieval:
         #with timer("An example"):
         #    df = self.retrieve(retriever_type=retriever_type, query_or_dataset=query_or_dataset, topk=topk)
 
+        df["retriever_type"] = retriever_type
+        df["topk"] = topk
+        df = df[["retriever_type", "topk", "hit@k", "mrr@k"]]
         df.to_csv(f'../outputs/output_{retriever_type}_topk_{topk}.csv', index=False)
         
         print(f"@@@@@@@@@@@@@@@@@@@@@@@@@  {retriever_type} done  @@@@@@@@@@@@@@@@@@@@@@@@@\n") 

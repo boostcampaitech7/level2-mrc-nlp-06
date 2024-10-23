@@ -1,0 +1,253 @@
+Namespace(config=None, wiki_path='../../../../../data/wikipedia_documents.json', data_path='../../../../../data/', train_folder='train_dataset/', eval_folder='eval_dataset/', model_name_or_path='../model/klue/bert-base', use_faiss=None, topk=1, test_ks=[1, 5, 10, 15, 20], __default_config__=Path_fr(../config/hybrid_retrieval.json, cwd=/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src))
+load dataset
+**************************************** query dataset ****************************************
+Dataset({
+    features: ['title', 'context', 'question', 'id', 'answers', 'document_id', '__index_level_0__'],
+    num_rows: 4192
+})
+Lengths of unique contexts : 56737
+not faiss
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+Embedding pickle load.
+model_path ../../../../../data/../model/klue/bert-base
+Passage Embedding pickle load.
+Passage dense embedding done.
+Traceback (most recent call last):
+  File "/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src/run_hybrid_retrieval.py", line 104, in <module>
+    retriever.test(retriever_type="hybrid", query_or_dataset=full_ds, topk=topk)
+  File "/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src/hybrid_retrieval.py", line 536, in test
+    df = self.retrieve(retriever_type=retriever_type, query_or_dataset=query_or_dataset, topk=topk)
+  File "/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src/hybrid_retrieval.py", line 335, in retrieve
+    self.get_passage_hybrid_embedding()
+  File "/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src/hybrid_retrieval.py", line 287, in get_passage_hybrid_embedding
+    p_sparse_embedding = dimension_reducer.fit_transform(p_sparse_embedding)
+  File "/opt/conda/lib/python3.10/site-packages/sklearn/utils/_set_output.py", line 273, in wrapped
+    data_to_wrap = f(self, X, *args, **kwargs)
+  File "/opt/conda/lib/python3.10/site-packages/sklearn/base.py", line 1351, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/opt/conda/lib/python3.10/site-packages/sklearn/decomposition/_truncated_svd.py", line 234, in fit_transform
+    U, Sigma, VT = svds(X, k=self.n_components, tol=self.tol, v0=v0)
+  File "/opt/conda/lib/python3.10/site-packages/scipy/sparse/linalg/_eigen/_svds.py", line 525, in svds
+    _, eigvec = eigsh(XH_X, k=k, tol=tol ** 2, maxiter=maxiter,
+  File "/opt/conda/lib/python3.10/site-packages/scipy/sparse/linalg/_eigen/arpack/arpack.py", line 1700, in eigsh
+    params.iterate()
+  File "/opt/conda/lib/python3.10/site-packages/scipy/sparse/linalg/_eigen/arpack/arpack.py", line 537, in iterate
+    self._arpack_solver(self.ido, self.bmat, self.which, self.k,
+KeyboardInterrupt
+Namespace(config=None, wiki_path='../../../../../data/wikipedia_documents.json', data_path='../../../../../data/', train_folder='train_dataset/', eval_folder='eval_dataset/', model_name_or_path='../model/klue/bert-base', use_faiss=None, topk=1, test_ks=[1, 5, 10, 15, 20], __default_config__=Path_fr(../config/hybrid_retrieval.json, cwd=/data/ephemeral/home/lsu/new_baseline/level2-mrc-nlp-06/retrieval/hybrid/src))
+load dataset
+**************************************** query dataset ****************************************
+Dataset({
+    features: ['title', 'context', 'question', 'id', 'answers', 'document_id', '__index_level_0__'],
+    num_rows: 4192
+})
+Lengths of unique contexts : 56737
+not faiss
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+Embedding pickle load.
+model_path ../../../../../data/../model/klue/bert-base
+Passage Embedding pickle load.
+Passage dense embedding done.
+[Build passage embedding] done in 523.496 s
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?, 현대적 인사조직관리의 시발점이 된 책은?, 강희제가 1717년에 쓴 글은 누구를 위해 쓰여졌는가? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  16%|█▌        | 678/4192 [00:00<00:00, 6777.76it/s]Sparse retrieval:  39%|███▉      | 1629/4192 [00:00<00:00, 8383.93it/s]Sparse retrieval:  61%|██████    | 2558/4192 [00:00<00:00, 8795.66it/s]Sparse retrieval:  83%|████████▎ | 3496/4192 [00:00<00:00, 9023.77it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 8866.08it/s]
+[query exhaustive search] done in 50.856 s
+hit@1 hybrid retrieval result by exhaustive search: 0.1429
+mrr@1 hybrid retrieval result by exhaustive search: 0.1429
+[exhaustive search] done in 578.930 s
+@@@@@@@@@@@@@@@@@@@@@@@@@  hybrid done  @@@@@@@@@@@@@@@@@@@@@@@@@
+
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Top-1 passage with score 51.652954
+미국의 대외 관계에서는 미국과 다른 나라들 간의 관계를 다룬다. 미국의 영향력은 15조 달러를 넘는 경제 , 세계의 약 4분의 1을 차지하는 GDP, 세계의 약 43%를 점유하는 
+[query exhaustive search] done in 0.296 s
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?, 현대적 인사조직관리의 시발점이 된 책은?, 강희제가 1717년에 쓴 글은 누구를 위해 쓰여졌는가? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  19%|█▉        | 794/4192 [00:00<00:00, 7932.95it/s]Sparse retrieval:  41%|████▏     | 1731/4192 [00:00<00:00, 8773.26it/s]Sparse retrieval:  63%|██████▎   | 2657/4192 [00:00<00:00, 8992.96it/s]Sparse retrieval:  86%|████████▌ | 3590/4192 [00:00<00:00, 9124.19it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 8996.05it/s]
+[query exhaustive search] done in 51.032 s
+hit@5 hybrid retrieval result by exhaustive search: 0.3433
+mrr@5 hybrid retrieval result by exhaustive search: 0.2175
+[exhaustive search] done in 51.114 s
+@@@@@@@@@@@@@@@@@@@@@@@@@  hybrid done  @@@@@@@@@@@@@@@@@@@@@@@@@
+
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Top-1 passage with score 51.652954
+미국의 대외 관계에서는 미국과 다른 나라들 간의 관계를 다룬다. 미국의 영향력은 15조 달러를 넘는 경제 , 세계의 약 4분의 1을 차지하는 GDP, 세계의 약 43%를 점유하는 
+Top-2 passage with score 50.589149
+미국은 경제적, 정치적, 군사적으로 전 세계에 많은 영향을 끼치고 있어서, 외교적 정책도 전 세계를 대상으로 하고 있다. 거의 모든 나라들이 워싱턴 DC에 대사관이 있으며 영사관들
+Top-3 passage with score 50.524582
+FOMC는 미국 정부의 금융 정책을 결정하는 최고 의사결정 기관이다. 공개시장활동을 감독하여 국가통화정책의 중요한 도구로 사용된다 미국의 중앙은행이라 할 수 있는 FRB(연방준비제
+Top-4 passage with score 50.215240
+미국 헌법 제1조는 연방법을 제정하고, 폐지하며 개정하는 모든 입법권을 의회에 부여한다. 또 연방 세금의 규모를 결정하고, 정부의 예산을 승인한다. 법률은 양원의 동의 없이는 제정
+Top-5 passage with score 49.509411
+2013년 6월 오바마 대통령에 의하여 톰 도닐론의 뒤를 이으는 데 국가안보보좌관으로 임명되었다. NBC 뉴스에 의하면 자신의 새 역할을 알리는 데 워싱턴 D. C.에서 이벤트가 
+[query exhaustive search] done in 0.292 s
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?, 현대적 인사조직관리의 시발점이 된 책은?, 강희제가 1717년에 쓴 글은 누구를 위해 쓰여졌는가? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  18%|█▊        | 770/4192 [00:00<00:00, 7696.83it/s]Sparse retrieval:  39%|███▉      | 1643/4192 [00:00<00:00, 8301.26it/s]Sparse retrieval:  60%|█████▉    | 2513/4192 [00:00<00:00, 8479.73it/s]Sparse retrieval:  80%|████████  | 3361/4192 [00:00<00:00, 8227.63it/s]Sparse retrieval: 100%|█████████▉| 4185/4192 [00:00<00:00, 8069.07it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 8138.63it/s]
+[query exhaustive search] done in 50.274 s
+hit@10 hybrid retrieval result by exhaustive search: 0.4280
+mrr@10 hybrid retrieval result by exhaustive search: 0.2288
+[exhaustive search] done in 50.379 s
+@@@@@@@@@@@@@@@@@@@@@@@@@  hybrid done  @@@@@@@@@@@@@@@@@@@@@@@@@
+
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Top-1 passage with score 51.652954
+미국의 대외 관계에서는 미국과 다른 나라들 간의 관계를 다룬다. 미국의 영향력은 15조 달러를 넘는 경제 , 세계의 약 4분의 1을 차지하는 GDP, 세계의 약 43%를 점유하는 
+Top-2 passage with score 50.589149
+미국은 경제적, 정치적, 군사적으로 전 세계에 많은 영향을 끼치고 있어서, 외교적 정책도 전 세계를 대상으로 하고 있다. 거의 모든 나라들이 워싱턴 DC에 대사관이 있으며 영사관들
+Top-3 passage with score 50.524582
+FOMC는 미국 정부의 금융 정책을 결정하는 최고 의사결정 기관이다. 공개시장활동을 감독하여 국가통화정책의 중요한 도구로 사용된다 미국의 중앙은행이라 할 수 있는 FRB(연방준비제
+Top-4 passage with score 50.215240
+미국 헌법 제1조는 연방법을 제정하고, 폐지하며 개정하는 모든 입법권을 의회에 부여한다. 또 연방 세금의 규모를 결정하고, 정부의 예산을 승인한다. 법률은 양원의 동의 없이는 제정
+Top-5 passage with score 49.509411
+2013년 6월 오바마 대통령에 의하여 톰 도닐론의 뒤를 이으는 데 국가안보보좌관으로 임명되었다. NBC 뉴스에 의하면 자신의 새 역할을 알리는 데 워싱턴 D. C.에서 이벤트가 
+Top-6 passage with score 49.431011
+펜스는 1988년과 1990년에 미 의원선거에서 2번 낙선한 후 몇 년 간 보수 성향의 라디오 쇼에서 진행자를 맡으며 인지도를 키웠다. 2000년 선거에서 인디애나주 하원의원에 당
+Top-7 passage with score 49.408344
+1972년에 실시된 메인 주 미국 하원 제2선거구 선거에 출마하면서 당선되었다. 제1기에서는 사법 위원회 소속 의원으로 활동하면서 워터게이트 사건 조사에 참여했는데 이는 리처드 닉
+Top-8 passage with score 49.117741
+라파엘 비센테 코레아 델가도(Rafael Vicente Correa Delgado, 라파엘 꼬레아, 1963년 4월 6일 - )는 에콰도르 공화국 정치인으로, 2017년 5월 24
+Top-9 passage with score 49.087326
+2010년 브라질 대통령 선거는 브라질의 제36대 대통령과 부통령을 뽑는 선거로, 브라질 현지 시각 기준으로 2010년 10월 3일 1차 투표가, 10월 31일 2차 투표가 치러졌
+Top-10 passage with score 49.065426
+제1조는 정부의 입법부 즉 미국 의회를 정의하고 있다. 여기에는 하원과 상원이 포함되어 상하 양원의 의원 선출 방법과 자격에 대해 규정하고 있다. 또한 의회에서 토론의 자유를 보장
+[query exhaustive search] done in 0.288 s
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?, 현대적 인사조직관리의 시발점이 된 책은?, 강희제가 1717년에 쓴 글은 누구를 위해 쓰여졌는가? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  19%|█▊        | 778/4192 [00:00<00:00, 7773.11it/s]Sparse retrieval:  39%|███▊      | 1614/4192 [00:00<00:00, 8116.92it/s]Sparse retrieval:  58%|█████▊    | 2426/4192 [00:00<00:00, 7842.26it/s]Sparse retrieval:  77%|███████▋  | 3212/4192 [00:00<00:00, 7632.36it/s]Sparse retrieval:  95%|█████████▍| 3977/4192 [00:00<00:00, 7579.54it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:00<00:00, 7669.44it/s]
+[query exhaustive search] done in 50.645 s
+hit@15 hybrid retrieval result by exhaustive search: 0.4800
+mrr@15 hybrid retrieval result by exhaustive search: 0.2329
+[exhaustive search] done in 50.761 s
+@@@@@@@@@@@@@@@@@@@@@@@@@  hybrid done  @@@@@@@@@@@@@@@@@@@@@@@@@
+
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Top-1 passage with score 51.652954
+미국의 대외 관계에서는 미국과 다른 나라들 간의 관계를 다룬다. 미국의 영향력은 15조 달러를 넘는 경제 , 세계의 약 4분의 1을 차지하는 GDP, 세계의 약 43%를 점유하는 
+Top-2 passage with score 50.589149
+미국은 경제적, 정치적, 군사적으로 전 세계에 많은 영향을 끼치고 있어서, 외교적 정책도 전 세계를 대상으로 하고 있다. 거의 모든 나라들이 워싱턴 DC에 대사관이 있으며 영사관들
+Top-3 passage with score 50.524582
+FOMC는 미국 정부의 금융 정책을 결정하는 최고 의사결정 기관이다. 공개시장활동을 감독하여 국가통화정책의 중요한 도구로 사용된다 미국의 중앙은행이라 할 수 있는 FRB(연방준비제
+Top-4 passage with score 50.215240
+미국 헌법 제1조는 연방법을 제정하고, 폐지하며 개정하는 모든 입법권을 의회에 부여한다. 또 연방 세금의 규모를 결정하고, 정부의 예산을 승인한다. 법률은 양원의 동의 없이는 제정
+Top-5 passage with score 49.509411
+2013년 6월 오바마 대통령에 의하여 톰 도닐론의 뒤를 이으는 데 국가안보보좌관으로 임명되었다. NBC 뉴스에 의하면 자신의 새 역할을 알리는 데 워싱턴 D. C.에서 이벤트가 
+Top-6 passage with score 49.431011
+펜스는 1988년과 1990년에 미 의원선거에서 2번 낙선한 후 몇 년 간 보수 성향의 라디오 쇼에서 진행자를 맡으며 인지도를 키웠다. 2000년 선거에서 인디애나주 하원의원에 당
+Top-7 passage with score 49.408344
+1972년에 실시된 메인 주 미국 하원 제2선거구 선거에 출마하면서 당선되었다. 제1기에서는 사법 위원회 소속 의원으로 활동하면서 워터게이트 사건 조사에 참여했는데 이는 리처드 닉
+Top-8 passage with score 49.117741
+라파엘 비센테 코레아 델가도(Rafael Vicente Correa Delgado, 라파엘 꼬레아, 1963년 4월 6일 - )는 에콰도르 공화국 정치인으로, 2017년 5월 24
+Top-9 passage with score 49.087326
+2010년 브라질 대통령 선거는 브라질의 제36대 대통령과 부통령을 뽑는 선거로, 브라질 현지 시각 기준으로 2010년 10월 3일 1차 투표가, 10월 31일 2차 투표가 치러졌
+Top-10 passage with score 49.065426
+제1조는 정부의 입법부 즉 미국 의회를 정의하고 있다. 여기에는 하원과 상원이 포함되어 상하 양원의 의원 선출 방법과 자격에 대해 규정하고 있다. 또한 의회에서 토론의 자유를 보장
+Top-11 passage with score 49.060524
+미국 텍사스주 미들랜드에서 아버지 조지 H. W. 부시와 어머니 바버라 부시 사이의 차남으로 태어났다. ‘젭’이라는 이름은 이니셜에서 따온 애칭으로 이 이름을 널리 쓰고 있다. 텍
+Top-12 passage with score 49.004547
+1950년대 동안 코널리는 보수적인 자세를 취하여 텍사스주 석유 부호 시드 W. 리처드슨을 위한 변호사와 진정자가 되었다. 그는 부동산과 목장에서 소유권을 취득하여 존슨처럼 자신의
+Top-13 passage with score 48.993431
+미국 상의원 또는 미국 상원(United States Senate)은 양원제인 미국 의회의 상원이다.\n\n미국 부통령이 상원의장이 된다. 각 주당 2명의 상원의원이 선출되어 10
+Top-14 passage with score 48.850674
+러시아 대통령은 러시아의 국내 및 대외 정책의 기본 방향을 결정하며, 국내외에서 러시아를 대표하는 존재이다. 대통령은 입법부와의 협의를 통해 러시아 대사를 임명하고 해임하며, 외국
+Top-15 passage with score 48.796806
+런던 의회(London Assembly)는 그레이터런던 당국의 산하 기구이다. 시민의 손으로 선출된 의원 25인으로 구성되며, 런던 시장의 활동을 견제하는 역할을 한다. 지난 20
+[query exhaustive search] done in 0.289 s
+
+@@@@@@@@@@@@@@@@@@@@@@@@@ hybrid method @@@@@@@@@@@@@@@@@@@@@@@@@
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?, 현대적 인사조직관리의 시발점이 된 책은?, 강희제가 1717년에 쓴 글은 누구를 위해 쓰여졌는가? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Sparse retrieval:   0%|          | 0/4192 [00:00<?, ?it/s]Sparse retrieval:  17%|█▋        | 697/4192 [00:00<00:00, 6964.03it/s]Sparse retrieval:  36%|███▌      | 1494/4192 [00:00<00:00, 7553.60it/s]Sparse retrieval:  54%|█████▎    | 2250/4192 [00:00<00:00, 7222.16it/s]Sparse retrieval:  71%|███████   | 2974/4192 [00:00<00:00, 2746.35it/s]Sparse retrieval:  88%|████████▊ | 3674/4192 [00:00<00:00, 3479.77it/s]Sparse retrieval: 100%|██████████| 4192/4192 [00:01<00:00, 4148.94it/s]
+[query exhaustive search] done in 51.679 s
+hit@20 hybrid retrieval result by exhaustive search: 0.5136
+mrr@20 hybrid retrieval result by exhaustive search: 0.2348
+[exhaustive search] done in 51.801 s
+@@@@@@@@@@@@@@@@@@@@@@@@@  hybrid done  @@@@@@@@@@@@@@@@@@@@@@@@@
+
+[Search queries]
+ 대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은? , ... etc. 
+
+[Search all queries by hybrid] 
+
+Top-1 passage with score 51.652954
+미국의 대외 관계에서는 미국과 다른 나라들 간의 관계를 다룬다. 미국의 영향력은 15조 달러를 넘는 경제 , 세계의 약 4분의 1을 차지하는 GDP, 세계의 약 43%를 점유하는 
+Top-2 passage with score 50.589149
+미국은 경제적, 정치적, 군사적으로 전 세계에 많은 영향을 끼치고 있어서, 외교적 정책도 전 세계를 대상으로 하고 있다. 거의 모든 나라들이 워싱턴 DC에 대사관이 있으며 영사관들
+Top-3 passage with score 50.524582
+FOMC는 미국 정부의 금융 정책을 결정하는 최고 의사결정 기관이다. 공개시장활동을 감독하여 국가통화정책의 중요한 도구로 사용된다 미국의 중앙은행이라 할 수 있는 FRB(연방준비제
+Top-4 passage with score 50.215240
+미국 헌법 제1조는 연방법을 제정하고, 폐지하며 개정하는 모든 입법권을 의회에 부여한다. 또 연방 세금의 규모를 결정하고, 정부의 예산을 승인한다. 법률은 양원의 동의 없이는 제정
+Top-5 passage with score 49.509411
+2013년 6월 오바마 대통령에 의하여 톰 도닐론의 뒤를 이으는 데 국가안보보좌관으로 임명되었다. NBC 뉴스에 의하면 자신의 새 역할을 알리는 데 워싱턴 D. C.에서 이벤트가 
+Top-6 passage with score 49.431011
+펜스는 1988년과 1990년에 미 의원선거에서 2번 낙선한 후 몇 년 간 보수 성향의 라디오 쇼에서 진행자를 맡으며 인지도를 키웠다. 2000년 선거에서 인디애나주 하원의원에 당
+Top-7 passage with score 49.408344
+1972년에 실시된 메인 주 미국 하원 제2선거구 선거에 출마하면서 당선되었다. 제1기에서는 사법 위원회 소속 의원으로 활동하면서 워터게이트 사건 조사에 참여했는데 이는 리처드 닉
+Top-8 passage with score 49.117741
+라파엘 비센테 코레아 델가도(Rafael Vicente Correa Delgado, 라파엘 꼬레아, 1963년 4월 6일 - )는 에콰도르 공화국 정치인으로, 2017년 5월 24
+Top-9 passage with score 49.087326
+2010년 브라질 대통령 선거는 브라질의 제36대 대통령과 부통령을 뽑는 선거로, 브라질 현지 시각 기준으로 2010년 10월 3일 1차 투표가, 10월 31일 2차 투표가 치러졌
+Top-10 passage with score 49.065426
+제1조는 정부의 입법부 즉 미국 의회를 정의하고 있다. 여기에는 하원과 상원이 포함되어 상하 양원의 의원 선출 방법과 자격에 대해 규정하고 있다. 또한 의회에서 토론의 자유를 보장
+Top-11 passage with score 49.060524
+미국 텍사스주 미들랜드에서 아버지 조지 H. W. 부시와 어머니 바버라 부시 사이의 차남으로 태어났다. ‘젭’이라는 이름은 이니셜에서 따온 애칭으로 이 이름을 널리 쓰고 있다. 텍
+Top-12 passage with score 49.004547
+1950년대 동안 코널리는 보수적인 자세를 취하여 텍사스주 석유 부호 시드 W. 리처드슨을 위한 변호사와 진정자가 되었다. 그는 부동산과 목장에서 소유권을 취득하여 존슨처럼 자신의
+Top-13 passage with score 48.993431
+미국 상의원 또는 미국 상원(United States Senate)은 양원제인 미국 의회의 상원이다.\n\n미국 부통령이 상원의장이 된다. 각 주당 2명의 상원의원이 선출되어 10
+Top-14 passage with score 48.850674
+러시아 대통령은 러시아의 국내 및 대외 정책의 기본 방향을 결정하며, 국내외에서 러시아를 대표하는 존재이다. 대통령은 입법부와의 협의를 통해 러시아 대사를 임명하고 해임하며, 외국
+Top-15 passage with score 48.796806
+런던 의회(London Assembly)는 그레이터런던 당국의 산하 기구이다. 시민의 손으로 선출된 의원 25인으로 구성되며, 런던 시장의 활동을 견제하는 역할을 한다. 지난 20
+Top-16 passage with score 48.790787
+1993년 1월 20일 취임식을 올린 클린턴은 대통령 직에서 한번 경제적 문제들에 지속적으로 일하였으며, 이자율과 실업이 떨어지기 시작하였다. 그는 부인 힐러리 여사를 국내적 보건
+Top-17 passage with score 48.768883
+대선을 약 1년 앞둔 2018년 9월 17일 차기 대선 출마를 선언했으며, 2019년 5월 26일 결선에서 당선되었다.  7월 12일 취임했으며,  4일 후 폴란드 바르샤바를 방문
+Top-18 passage with score 48.758804
+뉴욕시 정부(government of New York City)는 뉴욕시 헌장 아래에 조직된 "강한" 시장 의회 (mayor-council system)을 취하는 미국 뉴욕의 지방
+Top-19 passage with score 48.711689
+비건은 1984년 미시간 대학교에서 러시아어와 정치학 학사 학위를 받았다. 1992년부터 1994년까지는 국제 공화주의 연구소의 러시아 모스크바 지국장으로 있었다. 조지 W. 부시
+Top-20 passage with score 48.674484
+소련 붕괴 이후 한동안 옐친과 우호 관계를 유지하던 루츠코이는 1992년부터 옐친의 경제 정책과 관료들의 부패에 대해 점차 반대 목소리를 내기 시작했다. 1993년 벌어진 1993
+[query exhaustive search] done in 0.286 s
