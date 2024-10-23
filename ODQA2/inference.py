@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # result_df.to_csv(os.path.join(config.save_path, 'retrieved.csv'), index=False)
 
     ### MRC
-    with open(os.path.join(reader_config.data_args.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
+    with open(os.path.join(reader_config.data_args.dataset_name, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
         reader_corpus = json.load(f)
     result_df['context'] = None
     for idx, doc_ids in enumerate(result_df['document_id']):

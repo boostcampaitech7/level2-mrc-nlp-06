@@ -43,7 +43,7 @@ class ExtractiveQA():
 
     def load_model(self):
         model_args, data_args, training_args = json_to_Arguments(self.config_path)
-        model_path = training_args.output_dir
+        model_path = os.path.join(training_args.output_dir, 'Extractive')
 
         # Model 불러오기
         self.model_config = AutoConfig.from_pretrained(
