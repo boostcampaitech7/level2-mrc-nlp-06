@@ -93,7 +93,7 @@ def get_base_and_tuned_bulk_predictions(pipe, samples, model):
     # first we enable the adapters in our model, so that inference with our pipeline
     # will be influenced by our trained weights.
     # then get the responses for our tuned version of the model.
-    model.enable_adapters()
+    # model.enable_adapters()  # 추가 학습된 가중치 이용해 인퍼런스 (<-> 기본 모델 사용: disable_adapters)
     responses = pipe(bulk_messages, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
     responses = [i[0]['generated_text'][-1]['content'] for i in responses]
 
@@ -123,9 +123,6 @@ def main():
     logger.info(datasets)
     train_dataset = datasets['train']
     eval_dataset = datasets['validation']
-
-    train_dataset = train_dataset.select(range(20))
-    eval_dataset = eval_dataset.select(range(20))
 
     with open(args.chat_template_path, 'r') as file:
         chat_template = file.read()
@@ -223,8 +220,9 @@ def main():
     # Evaluation --------------------------------------------------------------
 
     # add trained adapter to the pre-trained llama model
-    # model.load_adapter(args.output_dir, adapter_name="adapter")
-    model.enable_adapters() # 추가 학습된 가중치 이용해 인퍼런스 (<-> 기본 모델 사용: disable_adapters)
+    if not model.is_adapter_loaded("adapter"):
+        model.load_adapter(args.output_dir, adapter_name="adapter")
+        model.enable_adapters() 
 
     # text-generation을 위해 huggingface pipeline으로 모델 감싸기
     model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
@@ -258,7 +256,7 @@ def main():
     # score calculation
     predicted_answer = conversation_validation_samples['predicted_answer']
     answers = conversation_validation_samples['answer']
-    trained_validation_bert_score = bertscore.compute(predictions=predicted_answer, references=answers, lang="en", model_type=bert_model, device="cuda:0")
+    trained_validation_bert_score = bertscore.compute(predictions=predicted_answer, references=answers, lang="en", model_type=args.bert_model, device="cuda:0")
     tuned_exact_match_score = em_f1_score.compute(predictions=predicted_answer, references=answers)
     tuned_averages = {
         key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
