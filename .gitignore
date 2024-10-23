@@ -169,3 +169,4 @@ mecab-ko-dic-2.1.1-20180720/
 wiki_embedding.db
 mlruns/
 wandb/
+ODQA2/outputs

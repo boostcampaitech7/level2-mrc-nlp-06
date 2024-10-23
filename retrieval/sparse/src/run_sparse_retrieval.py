@@ -80,6 +80,7 @@ def main():
             embedding_method=args.embedding_method, # 'tfidf', 'bm25'
             tokenizer=tokenizer,                    # 'mecab', 허깅페이스 토크나이저 (예: 'klue/bert-base' 등)
             contexts=contexts,                      # wikipedia contexts
+            document_ids=ids                        # wikipedia document_ids
         )
     elif args.embedding_method in ['splade', 'bge-m3']:
         # 클래스 선언 - SPLADE / BGE-M3
