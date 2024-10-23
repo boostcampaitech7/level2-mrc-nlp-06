@@ -1,0 +1,9 @@
+{
+    "model_name": "meta-llama/Llama-3.1-8B",
+    "data_path": "/data/ephemeral/home/datasets/v0.0.2",
+    "chat_template_path": "/data/ephemeral/home/minji/reader/abstractive/src/llama_chat_template.txt",
+    "output_dir": "/data/ephemeral/home/minji/models/outputs",
+    "bnb_4bit_quant_type": "nf4",
+    "num_train_epochs": 3,
+    "bert_model": "distilbert-base-uncased"
+}
