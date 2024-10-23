@@ -66,7 +66,7 @@ if __name__ == "__main__":
     elif retriever_config.embedding_method == "bm25":
         retriever.get_sparse_embedding_bm25()
 
-    test_dataset = load_from_disk(retriever_config.eval_data_path)['validation']
+    test_dataset = load_from_disk(retriever_config.eval_data_path)['test']
     logger.info("Evaluation dataset loaded with %d examples.", len(test_dataset))
 
     result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=True, retrieval_save_path=config.save_path)

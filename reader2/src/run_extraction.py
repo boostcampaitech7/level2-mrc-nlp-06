@@ -176,7 +176,7 @@ def run_mrc_extract(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train(resume_from_checkpoint=False)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
