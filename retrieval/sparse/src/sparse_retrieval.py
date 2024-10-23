@@ -31,7 +31,7 @@ from pymilvus.model.sparse import SpladeEmbeddingFunction
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # from utils_sparse_retrieval import timer, hit, mrr
-from utils.utils_sparse_retrieval import timer, hit, mrr
+from utils_sparse_retrieval import timer, hit, mrr
 
 # logger 지정
 logging.basicConfig(
