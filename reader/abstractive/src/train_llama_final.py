@@ -13,18 +13,18 @@
 
 # Data Preparation ------------------------------------------
 
-from datasets import load_from_disk
-import argparse
-import logging
 import sys
+import logging
 import json
+from box import Box
+import argparse
+from datasets import load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments, pipeline
-import torch
 from peft import prepare_model_for_kbit_training, LoraConfig
 from trl import SFTTrainer
 from evaluate import load
-import os
-from box import Box
+import torch
+import gc
 
 
 logging.basicConfig(
@@ -214,15 +214,43 @@ def main():
     # 학습 및 학습된 weight 저장
     trainer.train()
     trainer.save_model(args.output_dir)  # adapter weight만 학습했으므로 이 adapter만 저장됨
+    
+    # move the model to the cpu and then delete the model, tokenizer and trainer objects
+    model.cpu()
+    del model, tokenizer, trainer
+    # We'll also call python to garbage collect any resources that might
+    # still be hanging around, and we'll clear the cuda cache.
+    gc.collect()
     torch.cuda.empty_cache()
 
 
     # Evaluation --------------------------------------------------------------
 
+    # reload tokenizer 
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer.padding_side = "left"
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.chat_template = chat_template
+
+    # load the base model
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type=args.bnb_4bit_quant_type,  ###TODO: 다른 옵션 테스트 
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        quantization_config = bnb_config,
+        device_map="auto"
+    )
+
     # add trained adapter to the pre-trained llama model
-    if not model.is_adapter_loaded("adapter"):
-        model.load_adapter(args.output_dir, adapter_name="adapter")
-        model.enable_adapters() 
+    model.load_adapter(args.output_dir, adapter_name="adapter")
+    model.enable_adapters() 
+
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.use_cache = False
 
     # text-generation을 위해 huggingface pipeline으로 모델 감싸기
     model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
