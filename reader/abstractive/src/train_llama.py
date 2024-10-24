@@ -82,17 +82,27 @@ def main():
     logger.info(f"model is from {args.model_name}")
     logger.info(f"data is from {args.data_path}")
 
-    # 데이터 불러오기
+    # 데이터셋 불러오기
     datasets = load_from_disk(args.data_path)
     korquad_datasets = load_from_disk("/data/ephemeral/home/datasets/korquad")
 
-    # 기존 train과 korquad train 데이터셋 결합
-    train_dataset = datasets['train']
-    korquad_train_dataset = korquad_datasets['train'].remove_columns('document_id')
-    korquad_eval_dataset = korquad_datasets['validation'].remove_columns('document_id')
+    # 기존 train과 eval 데이터셋에서 'document_id' 열 제거
+    train_dataset = datasets['train'].remove_columns('document_id')
+    eval_dataset = datasets['validation'].remove_columns('document_id')
+
+    # korquad train과 validation을 절반씩 추출 (시간관계 상)
+    korquad_train_dataset_split = korquad_datasets['train'].train_test_split(train_size=0.5)
+    korquad_eval_dataset_split = korquad_datasets['validation'].train_test_split(train_size=0.5)
+
+    # train과 eval의 train 부분만 결합
+    korquad_train_dataset = korquad_train_dataset_split['train']
+    korquad_eval_dataset = korquad_eval_dataset_split['train']
+
+    # 기존 데이터셋과 korquad 데이터셋 결합
     train_dataset = concatenate_datasets([train_dataset, korquad_train_dataset, korquad_eval_dataset])
-    eval_dataset = datasets['validation']
-    logger.info("dataset loaded")
+
+    # 데이터셋 크기 출력
+    logger.info(f"{len(train_dataset)} data are used for training.")
     
 
     with open(args.prompt_path, "r") as f:
