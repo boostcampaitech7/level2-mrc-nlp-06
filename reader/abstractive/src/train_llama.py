@@ -1,15 +1,12 @@
-# reference: https://medium.com/@coldstart_coder/fine-tuning-llama-3-2-11b-for-question-answering-435c28bb57c1
-
-# Llama 3.2 11B 모델을 Q-LoRA fine-tuning해서 QA task 접근
-# Llama 3.1 8B 
+# reference
+# 1. https://medium.com/@coldstart_coder/fine-tuning-llama-3-2-11b-for-question-answering-435c28bb57c1
+# 2. https://github.com/huggingface/huggingface-llama-recipes?tab=readme-ov-file
 
 # metric
 # - bert-score: 모델 출력과 예상 답변 사이의 의미적 유사성 측정
 # - EM, F1-score: 정확한 답변 반환 여부
 
-
-# Model and Dataset Access
-# huggingface-cli login
+# Model and Dataset Access: huggingface-cli login
 
 # Data Preparation ------------------------------------------
 
@@ -44,60 +41,27 @@ def load_config(config_path: str):
     return config
 
 # Llama conversation format으로 데이터 변환 
-def convert_squad_sample_to_llama_conversation(sample, tokenizer):
-    # get the question and context for this sample
+def convert_squad_sample_to_llama_conversation(sample, tokenizer, instruction_prompt_template):
     question = sample['question']
     context = sample['context']
-
-    # some questions can have multiple answers, some none at all,
-    # for the case of no answers we'll have the model output that the
-    # context does not provide an answer, if it has multiple we'll just take
-    # the first answer as the ground truth.
     answers = sample['answers']['text']
     if len(answers) == 0 :
       answer = "The context does not provide an answer..."
     else:
       answer = sample['answers']['text'][0]
 
-    # now we define an initial model prompt defining the task and giving the model the context passage
-    # 프롬프트 한국어로 바꾸면 성능 더 좋아질까?
-    instruction_prompt_template = '''You are a helpful assistant tasked with extracting passages that answer users questions from a given context. Output exact passages word for word that answer the users question. Do not output any other text other than passages in the context passage. Output the minimal amount to answer the question, for example only 2-3 words from the passage. If you cannot find the answer in the context passage output 'The context does not provide an answer...'
-
-    Context: {context}'''
-
-    # now we'll convert these into a list of messages for our conversation
     messages = [
         {"role": "system", "content": instruction_prompt_template.format(context=context)},
         {"role": "user", "content": question},
         {"role": "assistant", "content": answer}
     ]
-    # apply the chat template and return the sample
-    # we'll also return the single answer we expect and the list of messages without
-    # the chat template in case we need them later.
     sample_conversation = tokenizer.apply_chat_template(messages, tokenize=False)
     return {"text": sample_conversation, "messages": messages, "answer": answer}
 
-
-# Helper function that will take in a pipeline loaded with our llm for question answer
-# and a list of samples to run inference on, it will return just the responses for each sample
-# def get_bulk_predictions(pipe, samples):
-#     responses = pipe(samples, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
-#     responses = [i[0]['generated_text'][-1]['content'] for i in responses]
-#     return responses
-
-# helper function that will take in a list of samples and run inference for both
-# our tuned and base model and return the results
-def get_base_and_tuned_bulk_predictions(pipe, samples, model):
+def get_base_and_tuned_bulk_predictions(pipe, samples): 
     bulk_messages = [i[:-1] for i in samples['messages']]
-
-    # first we enable the adapters in our model, so that inference with our pipeline
-    # will be influenced by our trained weights.
-    # then get the responses for our tuned version of the model.
-    # model.enable_adapters()  # 추가 학습된 가중치 이용해 인퍼런스 (<-> 기본 모델 사용: disable_adapters)
-    responses = pipe(bulk_messages, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
+    responses = pipe(bulk_messages, max_new_tokens=64, batch_size=len(samples), do_sample=False)
     responses = [i[0]['generated_text'][-1]['content'] for i in responses]
-
-    # now return the base model predictions and the tuned model predictions
     return {"predicted_answer": responses}
 
 
@@ -124,18 +88,17 @@ def main():
     train_dataset = datasets['train']
     eval_dataset = datasets['validation']
 
-    with open(args.chat_template_path, 'r') as file:
-        chat_template = file.read()
+    with open(args.chat_template_path, "r") as f:
+        instruction_prompt_template = f.read()
     
     # 모델 및 토크나이저 로드
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.chat_template = chat_template
 
     # Llama 학습을 위한 형태로 데이터 변환
-    conversation_training_samples = train_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer))
-    conversation_validation_samples = eval_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer))
+    conversation_training_samples = train_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer, instruction_prompt_template))
+    conversation_validation_samples = eval_dataset.map(lambda sample: convert_squad_sample_to_llama_conversation(sample, tokenizer, instruction_prompt_template))
 
 
     # Model Preparation Preparation ------------------------------------------
@@ -155,7 +118,6 @@ def main():
     )
     model.config.pad_token_id = tokenizer.pad_token_id
     model = prepare_model_for_kbit_training(model)
-    # model.config.pad_token_id = tokenizer.pad_token_id
     model.config.use_cache = False   # 학습 중이고, output이 변경될 것으로 예상되므로 
 
     # PEFT config 정의
@@ -167,8 +129,6 @@ def main():
         lora_dropout=0.05, # dropout for the lora layers while training, to avoid overfitting
         bias="none",
         task_type="CAUSAL_LM",
-        # the target modules defines what types of layers to add lora adapters too, so in the network
-        # any model that have a name in this list will have a lora adapter added to it,
         target_modules=['k_proj', 'q_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj']
     )
 
@@ -230,7 +190,6 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.chat_template = chat_template
 
     # load the base model
     bnb_config = BitsAndBytesConfig(
@@ -256,7 +215,7 @@ def main():
     model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
     # inference on validation set
-    conversation_validation_samples = conversation_validation_samples.map(lambda samples: get_base_and_tuned_bulk_predictions(pipe=model_pipe, samples=samples, model=model), batched=True, batch_size=20)
+    conversation_validation_samples = conversation_validation_samples.map(lambda samples: get_base_and_tuned_bulk_predictions(pipe=model_pipe, samples=samples), batched=True, batch_size=5)
 
     # save the result
     result_dict = {}  # id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
