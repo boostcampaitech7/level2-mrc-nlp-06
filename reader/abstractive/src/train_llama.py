@@ -88,7 +88,7 @@ def main():
     train_dataset = datasets['train']
     eval_dataset = datasets['validation']
 
-    with open(args.chat_template_path, "r") as f:
+    with open(args.prompt_path, "r") as f:
         instruction_prompt_template = f.read()
     
     # 모델 및 토크나이저 로드
