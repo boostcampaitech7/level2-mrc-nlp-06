@@ -35,7 +35,10 @@ class LlamaQA():
         self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name)
         self.tokenizer.padding_side = "left"
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.tokenizer.chat_template = self.chat_template
+
+        with open(self.args.chat_template_path, 'r') as file:
+            chat_template = file.read()
+        self.tokenizer.chat_template = chat_template
 
         # load the base model
         bnb_config = BitsAndBytesConfig(
@@ -93,10 +96,11 @@ class LlamaQA():
 
     def get_base_and_tuned_bulk_predictions(self, samples):
         bulk_messages = [i[:-1] for i in samples['messages']]
-        responses = self.pipe(bulk_messages, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
+        responses = self.model_pipe(bulk_messages, max_new_tokens=512, batch_size=len(samples), do_sample=False, top_p=None)
         responses = [i[0]['generated_text'][-1]['content'] for i in responses]
         return {"predicted_answer": responses}
 
+    
     def predict(self, datasets, save_path):
         # text-generation을 위해 huggingface pipeline으로 모델 감싸기
         self.model_pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
@@ -105,62 +109,18 @@ class LlamaQA():
             chat_template = file.read()
         self.tokenizer.chat_template = chat_template
 
-        datasets = load_from_disk(self.args.data_path)
-        eval_dataset = datasets['validation']
-        test_dataset = datasets['test']
-
-        eval_dataset = eval_dataset.select(range(20))
-        test_dataset = test_dataset.select(range(20))
-
-        # Llama 학습을 위한 형태로 데이터 변환
-        conversation_validation_samples = eval_dataset.map(self.convert_squad_sample_to_llama_conversation)
-        conversation_test_samples = test_dataset.map(self.convert_squad_sample_to_llama_conversation)
-
-        # inference 
-        conversation_validation_samples = conversation_validation_samples.map(self.get_base_and_tuned_bulk_predictions, batched=True, batch_size=20)
-        conversation_test_samples = conversation_test_samples.map(self.get_base_and_tuned_bulk_predictions, batched=True, batch_size=20)
+        # 데이터 형태 변환 및 추론
+        conversation_datasets = datasets.map(self.convert_squad_sample_to_llama_conversation)
+        conversation_datasets = conversation_datasets.map(self.get_base_and_tuned_bulk_predictions, batched=True, batch_size=20)
 
         # prediction 결과 저장
-        valid_result_dict = {}  # id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
-        for sample in conversation_validation_samples:
-            sample_id = sample['id']
-            answer = sample['answer']
-            predicted_answer = sample['predicted_answer']
-            
-            valid_result_dict[sample_id] = {
-                'answer': answer,
-                'predicted_answer': predicted_answer
-            }
-        valid_output_file = save_path + "/valid/predictions_with_answer.json"
-        with open(valid_output_file, "w", encoding="utf-8") as f:
-            json.dump(valid_result_dict, f, ensure_ascii=False, indent=4)
-
         test_result_dict = {}
-        for sample in conversation_test_samples:
+        for sample in conversation_datasets:
             sample_id = sample['id']
             predicted_answer = sample['predicted_answer']
             test_result_dict[sample_id] = predicted_answer
-        test_output_file = save_path + "/test/predictions.json"
+        test_output_file = save_path + "/predictions.json"
         with open(test_output_file, "w", encoding="utf-8") as f:
             json.dump(test_result_dict, f, ensure_ascii=False, indent=4)
 
-
-        # score calculation
-        bertscore = load("bertscore")
-        em_f1_score = load("squad")
-
-        # score calculation
-        bert_predictions = conversation_validation_samples['predicted_answer']
-        bert_references = conversation_validation_samples['answer']
-
-        ex_predictions = [{'id': sample['id'], 'prediction_text': sample['predicted_answer']} for sample in conversation_validation_samples]
-        ex_references = [{'id': sample['id'], 'answers': [{'text': sample['answers']['text'][0], 'answer_start': sample['answers']['answer_start'][0]}]} for sample in conversation_validation_samples]
-
-        trained_validation_bert_score = bertscore.compute(predictions=bert_predictions, references=bert_references, lang="kr", model_type=self.args.bert_model, device="cuda:0")
-        tuned_exact_match_score = em_f1_score.compute(predictions=ex_predictions, references=ex_references)
-        tuned_averages = {
-            key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
-        }
-        tuned_averages['exact_match'] = tuned_exact_match_score['exact_match']
-        tuned_averages['squad_f1'] = tuned_exact_match_score['f1']
-        logger.info(tuned_averages)
+        return test_result_dict

@@ -124,9 +124,6 @@ def main():
     train_dataset = datasets['train']
     eval_dataset = datasets['validation']
 
-    train_dataset = train_dataset.select(range(20))
-    eval_dataset = eval_dataset.select(range(20))
-
     with open(args.chat_template_path, 'r') as file:
         chat_template = file.read()
     
@@ -158,7 +155,7 @@ def main():
     )
     model.config.pad_token_id = tokenizer.pad_token_id
     model = prepare_model_for_kbit_training(model)
-    model.config.pad_token_id = tokenizer.pad_token_id
+    # model.config.pad_token_id = tokenizer.pad_token_id
     model.config.use_cache = False   # 학습 중이고, output이 변경될 것으로 예상되므로 
 
     # PEFT config 정의
@@ -229,77 +226,77 @@ def main():
 
     # Evaluation --------------------------------------------------------------
 
-#     # reload tokenizer 
-#     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-#     tokenizer.padding_side = "left"
-#     tokenizer.pad_token = tokenizer.eos_token
-#     tokenizer.chat_template = chat_template
+    # reload tokenizer 
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer.padding_side = "left"
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.chat_template = chat_template
 
-#     # load the base model
-#     bnb_config = BitsAndBytesConfig(
-#         load_in_4bit=True,
-#         bnb_4bit_quant_type=args.bnb_4bit_quant_type,  ###TODO: 다른 옵션 테스트 
-#         bnb_4bit_compute_dtype=torch.float16,
-#         bnb_4bit_use_double_quant=True
-#     )
-#     model = AutoModelForCausalLM.from_pretrained(
-#         args.model_name,
-#         quantization_config = bnb_config,
-#         device_map="auto"
-#     )
+    # load the base model
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type=args.bnb_4bit_quant_type,  ###TODO: 다른 옵션 테스트 
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        quantization_config = bnb_config,
+        device_map="auto"
+    )
 
-#     # add trained adapter to the pre-trained llama model
-#     model.load_adapter(args.output_dir, adapter_name="adapter")
-#     model.enable_adapters() 
+    # add trained adapter to the pre-trained llama model
+    model.load_adapter(args.output_dir, adapter_name="adapter")
+    model.enable_adapters() 
 
-#     model.config.pad_token_id = tokenizer.pad_token_id
-#     model.config.use_cache = False
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.config.use_cache = False
 
-#     # text-generation을 위해 huggingface pipeline으로 모델 감싸기
-#     model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
+    # text-generation을 위해 huggingface pipeline으로 모델 감싸기
+    model_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
-#     # inference on validation set
-#     conversation_validation_samples = conversation_validation_samples.map(lambda samples: get_base_and_tuned_bulk_predictions(pipe=model_pipe, samples=samples, model=model), batched=True, batch_size=20)
+    # inference on validation set
+    conversation_validation_samples = conversation_validation_samples.map(lambda samples: get_base_and_tuned_bulk_predictions(pipe=model_pipe, samples=samples, model=model), batched=True, batch_size=20)
 
-#     # save the result
-#     result_dict = {}  # id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
-#     for sample in conversation_validation_samples:
-#         sample_id = sample['id']
-#         answer = sample['answer']
-#         predicted_answer = sample['predicted_answer']
+    # save the result
+    result_dict = {}  # id별로 answer와 predicted_answer 저장할 계층형 딕셔너리 생성
+    for sample in conversation_validation_samples:
+        sample_id = sample['id']
+        answer = sample['answer']
+        predicted_answer = sample['predicted_answer']
         
-#         result_dict[sample_id] = {
-#             'answer': answer,
-#             'predicted_answer': predicted_answer
-#         }
+        result_dict[sample_id] = {
+            'answer': answer,
+            'predicted_answer': predicted_answer
+        }
 
-#     output_file = args.output_dir + "/predictions.json"
-#     with open(output_file, "w", encoding="utf-8") as f:
-#         json.dump(result_dict, f, ensure_ascii=False, indent=4)
+    output_file = args.output_dir + "/predictions.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(result_dict, f, ensure_ascii=False, indent=4)
 
-#     logger.info(f"Data saved to {output_file}")
-
-
-#     # load metrics
-#     bertscore = load("bertscore")
-#     em_f1_score = load("squad")
-
-#     # score calculation
-#     bert_predictions = conversation_validation_samples['predicted_answer']
-#     bert_references = conversation_validation_samples['answer']
-
-#     ex_predictions = [{'id': sample['id'], 'prediction_text': sample['predicted_answer']} for sample in conversation_validation_samples]
-#     ex_references = [{'id': sample['id'], 'answers': [{'text': sample['answers']['text'][0], 'answer_start': sample['answers']['answer_start'][0]}]} for sample in conversation_validation_samples]
-
-#     trained_validation_bert_score = bertscore.compute(predictions=bert_predictions, references=bert_references, lang="kr", model_type=args.bert_model, device="cuda:0")
-#     tuned_exact_match_score = em_f1_score.compute(predictions=ex_predictions, references=ex_references)
-#     tuned_averages = {
-#         key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
-#     }
-#     tuned_averages['exact_match'] = tuned_exact_match_score['exact_match']
-#     tuned_averages['squad_f1'] = tuned_exact_match_score['f1']
-#     logger.info(tuned_averages)
+    logger.info(f"Data saved to {output_file}")
 
 
-# if __name__ == "__main__":
-# 	main()
+    # load metrics
+    bertscore = load("bertscore")
+    em_f1_score = load("squad")
+
+    # score calculation
+    bert_predictions = conversation_validation_samples['predicted_answer']
+    bert_references = conversation_validation_samples['answer']
+
+    ex_predictions = [{'id': sample['id'], 'prediction_text': sample['predicted_answer']} for sample in conversation_validation_samples]
+    ex_references = [{'id': sample['id'], 'answers': [{'text': sample['answers']['text'][0], 'answer_start': sample['answers']['answer_start'][0]}]} for sample in conversation_validation_samples]
+
+    trained_validation_bert_score = bertscore.compute(predictions=bert_predictions, references=bert_references, lang="kr", model_type=args.bert_model, device="cuda:0")
+    tuned_exact_match_score = em_f1_score.compute(predictions=ex_predictions, references=ex_references)
+    tuned_averages = {
+        key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
+    }
+    tuned_averages['exact_match'] = tuned_exact_match_score['exact_match']
+    tuned_averages['squad_f1'] = tuned_exact_match_score['f1']
+    logger.info(tuned_averages)
+
+
+if __name__ == "__main__":
+	main()
