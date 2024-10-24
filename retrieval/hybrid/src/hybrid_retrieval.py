@@ -538,9 +538,12 @@ class HybridRetrieval:
             
             df["hit@k"] = df.apply(lambda row:row["original_context"] in row["context"], axis=1)
             df["mrr@k"] = df.apply(lambda row:1 / row["original_document_rank"], axis=1)
+
+            df["hit@k"] = df['hit@k'].sum() / len(df)
+            df["mrr@k"] = df['mrr@k'].sum() / len(df)
             
-            print(f"hit@{topk} {retriever_type} retrieval result by exhaustive search: {df['hit@k'].sum() / len(df):.4f}")
-            print(f"mrr@{topk} {retriever_type} retrieval result by exhaustive search: {df['mrr@k'].sum() / len(df):.4f}")
+            print(f"hit@{topk} {retriever_type} retrieval result by exhaustive search: {df['hit@k']:.4f}")
+            print(f"mrr@{topk} {retriever_type} retrieval result by exhaustive search: {df['mrr@k']:.4f}")
 
         #with timer("An example"):
         #    df = self.retrieve(retriever_type=retriever_type, query_or_dataset=query_or_dataset, topk=topk)
@@ -551,4 +554,4 @@ class HybridRetrieval:
         df = df[["retriever_name", "topk", "hit@k", "mrr@k"]]
         df.to_csv(f'../outputs/output_{retriever_name}_topk_{topk}.csv', index=False)
         
-        print(f"@@@@@@@@@@@@@@@@@@@@@@@@@  {retriever_type} done  @@@@@@@@@@@@@@@@@@@@@@@@@\n") 
+        print(f"@@@@@@@@@@@@@@@@@@@@@@@@@  {retriever_type} done  @@@@@@@@@@@@@@@@@@@@@@@@@\n")  
