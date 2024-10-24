@@ -128,6 +128,7 @@ class HybridRetrieval:
 
         model_name = self.model_args.model_name_or_path
         tokenizer_path = model_name
+        model_folder_path = "../model/" if model_name.startswith("../model/") else self.data_path
 
         if tokenizer_path.startswith("../model/"):tokenizer_path = tokenizer_path + "/tokenizer/"
         self.sparse_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path) # use_fast=False
@@ -141,8 +142,8 @@ class HybridRetrieval:
         pickle_name = f"{model_name.replace('/', '_').replace('//', '_')}_{retriever_type}_embedding.bin"
         tfidfv_name = f"{model_name.replace('/', '_').replace('//', '_')}_{retriever_type}_v.bin"
 
-        emb_path = os.path.join(self.data_path, pickle_name)
-        tfidfv_path = os.path.join(self.data_path, tfidfv_name)
+        emb_path = os.path.join(model_folder_path, pickle_name)
+        tfidfv_path = os.path.join(model_folder_path, tfidfv_name)
 
         if os.path.isfile(emb_path) and os.path.isfile(tfidfv_path):
             self.p_sparse_embedding = load_pickle(emb_path)
@@ -172,10 +173,12 @@ class HybridRetrieval:
 
         # Pickle을 저장합니다.
         model_name = model_args.model_name_or_path
+        model_folder_path = "../model/" if model_name.startswith("../model/") else self.data_path
+
         embedding_name = f"{model_name.replace('/', '_').replace('//', '_')}_bi_dense_embedding.bin"
 
-        emb_path = os.path.join(self.data_path, embedding_name)
-        model_path = os.path.join(self.data_path, model_name)
+        emb_path = os.path.join(model_folder_path, embedding_name)
+        model_path = os.path.join(model_folder_path, model_name)
                 
         print("model_path",model_path)
 
@@ -230,12 +233,14 @@ class HybridRetrieval:
 
         model_name = self.model_args.model_name_or_path
 
+        model_folder_path = "../model/" if model_name.startswith("../model/") else self.data_path
+
         # Pickle을 저장합니다.
         hybrid_name = f"{model_name.replace('/', '_').replace('//', '_')}_hybrid_embedding.bin"
         dimension_reducer_name = f"{model_name.replace('/', '_').replace('//', '_')}_hybridv.bin"
 
-        hybrid_path = os.path.join(self.data_path, hybrid_name)
-        dimension_reducer_path = os.path.join(self.data_path, dimension_reducer_name)
+        hybrid_path = os.path.join(model_folder_path, hybrid_name)
+        dimension_reducer_path = os.path.join(model_folder_path, dimension_reducer_name)
 
         if os.path.isfile(dimension_reducer_path):
             self.dimension_reducer = load_pickle(dimension_reducer_path)
