@@ -15,7 +15,7 @@ import logging
 import json
 from box import Box
 import argparse
-from datasets import load_from_disk
+from datasets import load_from_disk, concatenate_datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments, pipeline
 from peft import prepare_model_for_kbit_training, LoraConfig
 from trl import SFTTrainer
@@ -84,9 +84,16 @@ def main():
 
     # 데이터 불러오기
     datasets = load_from_disk(args.data_path)
-    logger.info(datasets)
+    korquad_datasets = load_from_disk("/data/ephemeral/home/datasets/korquad")
+
+    # 기존 train과 korquad train 데이터셋 결합
     train_dataset = datasets['train']
+    korquad_train_dataset = korquad_datasets['train'].remove_columns('document_id')
+    korquad_eval_dataset = korquad_datasets['validation'].remove_columns('document_id')
+    train_dataset = concatenate_datasets([train_dataset, korquad_train_dataset, korquad_eval_dataset])
     eval_dataset = datasets['validation']
+    logger.info("dataset loaded")
+    
 
     with open(args.prompt_path, "r") as f:
         instruction_prompt_template = f.read()
