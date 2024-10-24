@@ -567,3 +567,4 @@ class HybridRetrieval:
         df.to_csv(f'../outputs/output_{retriever_name}_topk_{topk}.csv', index=False)
         
         print(f"@@@@@@@@@@@@@@@@@@@@@@@@@  {retriever_type} done  @@@@@@@@@@@@@@@@@@@@@@@@@\n") 
+        
