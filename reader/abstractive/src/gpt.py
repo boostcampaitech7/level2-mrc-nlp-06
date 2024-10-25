@@ -9,7 +9,7 @@ from datasets import load_from_disk
 DATA_PATH: corpus의 개행이 답변에 포함되지 않도록 개행 처리된 버전의 데이터셋 입력
 RETRIEVED_PATH: sparse retrieval을 수행 후 생성되는 csv 파일 경로 입력
 '''
-# DATA_PATH = "/data/ephemeral/home/datasets/v0.0.2"
+DATA_PATH = "/data/ephemeral/home/datasets/v0.0.2"
 RETRIEVED_PATH = '../../../outputsbm25.csv'
 
 def system_prompt(pred_type):
