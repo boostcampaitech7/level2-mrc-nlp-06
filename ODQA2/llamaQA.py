@@ -93,14 +93,12 @@ class LlamaQA():
         conversation_datasets = datasets.map(self.convert_squad_sample_to_llama_conversation)
         conversation_datasets = conversation_datasets.map(self.get_base_and_tuned_bulk_predictions, batched=True, batch_size=5)
 
+        # Metric을 구할 수 있도록 Format을 맞춰줍니다.
+        formatted_predictions = [{"id": sample["id"], "prediction_text": sample["predicted_answer"]} for sample in conversation_datasets]
+
         # prediction 결과 저장
-        test_result_dict = {}
-        for sample in conversation_datasets:
-            sample_id = sample['id']
-            predicted_answer = sample['predicted_answer']
-            test_result_dict[sample_id] = predicted_answer
         test_output_file = save_path + "/predictions.json"
         with open(test_output_file, "w", encoding="utf-8") as f:
-            json.dump(test_result_dict, f, ensure_ascii=False, indent=4)
+            json.dump(formatted_predictions, f, ensure_ascii=False, indent=4)
 
-        return test_result_dict
+        return formatted_predictions

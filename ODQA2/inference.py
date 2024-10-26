@@ -97,70 +97,33 @@ if __name__ == "__main__":
     elif retriever_config.embedding_method == "bm25":
         retriever.get_sparse_embedding_bm25()
 
-    valid_dataset = load_from_disk(retriever_config.eval_data_path)['validation']
     test_dataset = load_from_disk(retriever_config.eval_data_path)['test']
     logger.info("Evaluation dataset loaded with %d examples.", len(test_dataset))
 
-    valid_df = retriever.retrieve(valid_dataset, topk=retriever_config.topk, save=False, retrieval_save_path=config.save_path)
-    test_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=False, retrieval_save_path=config.save_path)
-    # result_df.to_csv(os.path.join(config.save_path, 'retrieved.csv'), index=False)
-
-    # Evaluate: Retrieval의 결과 평가 (metric: Hit@K, MRR@K)
-    logger.info("Evaluating retrieval performance.")
-    evaluation_results = {}
-    for eval_method in retriever_config.eval_metric:  # args.eval_metric: 'hit', 'mrr'
-        result = evaluate(
-            retrieved_df=valid_df,
-            eval_metric=eval_method,
-        )
-        evaluation_results[eval_method] = result
-
-    logger.info("# ------------------------------------------- #")
-    logger.info(f"\tRetrieval Score")
-    logger.info(f"\tHit@K: {evaluation_results['hit']:.4f}")
-    logger.info(f"\tMRR@K: {evaluation_results['mrr']:.4f}")
-    logger.info("# ------------------------------------------- #")
-
+    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=False, retrieval_save_path=config.save_path)
 
     ### MRC
-    # with open(os.path.join(reader_config.data_args.dataset_name, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
-    #     reader_corpus = json.load(f)
-    with open(os.path.join(reader_config.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
-        reader_corpus = json.load(f)
-    valid_df['context'] = None
-    test_df['context'] = None
-    for idx, doc_ids in enumerate(valid_df['document_id']):
-        valid_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
-    for idx, doc_ids in enumerate(test_df['document_id']):
-        test_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
+    
+    # wikipedia_documents의 document_id 키 이용해 context 매치
+    if config.reader_type == "extractive":
+        with open(os.path.join(reader_config.data_args.dataset_name, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
+            reader_corpus = json.load(f)
+    elif config.reader_type == "llama":
+        with open(os.path.join(reader_config.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
+            reader_corpus = json.load(f)
+    
+    result_df['context'] = None
+    for idx, doc_ids in enumerate(result_df['document_id']):
+        result_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
 
-    retrieved_validation = Dataset.from_pandas(valid_df)
-    retrieved_test = Dataset.from_pandas(test_df)
-    # reader = ExtractiveQA(config.reader)
-    reader = LlamaQA(config.reader)
-    reader.load_model()
-    validation_prediction_dict = reader.predict(retrieved_validation, config.save_path)
-    test_prediction_dict = reader.predict(retrieved_test, config.save_path)
+    retrieved_test = Dataset.from_pandas(result_df)
+    
 
-
-
-
-    # 최종 ODQA 성능 확인 ----------------------------------------------------
-    bertscore = load("bertscore")
-    em_f1_score = load("squad")
-
-    # score calculation
-    bert_predictions = validation_prediction_dict['predicted_answer']
-    bert_references = [sample['answers']['text'][0] for sample in valid_dataset]
-
-    ex_predictions = [{'id': sample['id'], 'prediction_text': sample['predicted_answer']} for sample in validation_prediction_dict]
-    ex_references = [{'id': sample['id'], 'answers': [{'text': sample['answers']['text'][0], 'answer_start': sample['answers']['answer_start'][0]}]} for sample in valid_dataset]
-
-    trained_validation_bert_score = bertscore.compute(predictions=bert_predictions, references=bert_references, lang="kr", model_type=reader_config.bert_model, device="cuda:0")
-    tuned_exact_match_score = em_f1_score.compute(predictions=ex_predictions, references=ex_references)
-    tuned_averages = {
-        key: sum(trained_validation_bert_score[key])/len(trained_validation_bert_score[key]) for key in ['precision', 'recall', 'f1']
-    }
-    tuned_averages['exact_match'] = tuned_exact_match_score['exact_match']
-    tuned_averages['squad_f1'] = tuned_exact_match_score['f1']
-    logger.info(tuned_averages)
+    if config.reader_type == "extractive":
+        reader = ExtractiveQA(config.reader)
+        reader.predict(retrieved_test, config.save_path)
+        
+    elif config.reader_type == "llama":
+        reader = LlamaQA(config.reader)
+        reader.load_model()
+        reader.predict(retrieved_test, config.save_path)
