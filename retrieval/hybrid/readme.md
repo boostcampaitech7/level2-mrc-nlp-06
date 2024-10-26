@@ -2,10 +2,19 @@
 Sparse retrieval과 dense retrieval의 혼합 사용 
 - sparse retrieval의 단어 수준의 직접적인 비교와 dense retrieval의 문맥적 의미의 유사성을 이용한 장점 결합
 
+## Requirements
+```
+jsonargparse==4.33.2
+scikit-learn==1.4.0
+transformers==4.45.2
+tqdm==4.65.0
+datasets==2.15.0
+```
+
 ## Usage
 **Config**  
 - [dense retrieval config](./config/dense_retrieval.json)
-- ```
+ ```
   {
   "wiki_path": "../../../../../data/wikipedia_documents.json", # path to wikipedia documents
   "data_path": "../../../../../data/", # path to train/validation dataset
@@ -28,7 +37,7 @@ Sparse retrieval과 dense retrieval의 혼합 사용
   ```
   
 - [hybrid retrieval config](./config/hybrid_retrieval.json)
-- ```
+ ```
   {
   "wiki_path": "../../../../../data/wikipedia_documents.json", # path to wikipedia documents
   "data_path": "../../../../../data/", # path to train/validation dataset
@@ -44,7 +53,7 @@ Sparse retrieval과 dense retrieval의 혼합 사용
   ```
 
 **How To Test**
-실행은 본 폴더의 하위 폴더인 [src](./src)에서 실행
+- 실행은 본 폴더의 하위 폴더인 [src](./src)에서 실행
 ```python
 # 지원하는 retriever_type : ["sparse", "dense", "hybrid", "two_stage"]
 python train_dense_retrieval.py # dense retrieval 학습
@@ -63,8 +72,6 @@ query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 �
 queries = [""대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?", "샤이닝 폼을 무엇이라고 칭하기도 하나요?"]
 retriever.retrieve(retriever_type=retriever_type, query_or_dataset=query, topk=topk) # single query
 retriever.retrieve(retriever_type=retriever_type, query_or_dataset=queries, topk=topk) # multiple queries
-
-
 ```
 
 **결과 저장**  
