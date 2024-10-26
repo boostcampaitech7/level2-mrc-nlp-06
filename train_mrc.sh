@@ -1,4 +1,4 @@
-config_name="./reader/extractive/config/base_config_v006.json"
+config_name="./reader/extractive/config/base_config.json"
 
 # 기본값 설정
 DO_EVAL=false

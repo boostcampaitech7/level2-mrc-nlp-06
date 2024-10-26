@@ -3,8 +3,7 @@
         "model_name_or_path":"uomnf97/klue-roberta-finetuned-korquad-v2",
         "config_name":null,
         "tokenizer_name":null,
-        "generation":false,
-        "retrieval_type":"dense"
+        "generation":false
     },
     "data_args":{
         "dataset_name":"../data/datasets/v0.0.1",
