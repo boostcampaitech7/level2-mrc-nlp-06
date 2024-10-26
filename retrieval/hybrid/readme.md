@@ -75,6 +75,10 @@ retriever.retrieve(retriever_type=retriever_type, query_or_dataset=query, topk=t
 retriever.retrieve(retriever_type=retriever_type, query_or_dataset=queries, topk=topk) # multiple queries
 ```
 
-**결과 저장**  
+**결과 저장**
 - 학습한 모델들은 `./model/` 폴더에, retrieval 결과는 `./outputs/`폴더에 csv 파일로 저장  
+```python
+retriever.test(retriever_type=retriever_type, query_or_dataset=queries, topk=topk)
+```
+
 
