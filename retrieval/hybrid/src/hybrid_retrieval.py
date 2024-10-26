@@ -15,14 +15,9 @@ from transformers import AutoConfig, AutoTokenizer, AutoModel, AutoModelForQuest
 import torch
 from torch.utils.data import DataLoader
 
-import bm25s
-from bm25s.tokenization import Tokenizer as BM25s_Tokenizer
-from rank_bm25 import BM25Okapi
-#from bm25_pt import BM25
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA, TruncatedSVD
 from scipy.sparse import spmatrix
-import umap
 
 sys.path.append(os.path.abspath("../utils/"))
 from utils import *
