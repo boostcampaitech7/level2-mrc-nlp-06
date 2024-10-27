@@ -26,7 +26,7 @@ class LlamaQA():
         with open(config_path, "r") as f:
             config = json.load(f)
         self.args = Box(config)
-        with open(self.args.propmt_path, "r") as f:
+        with open(self.args.prompt_path, "r") as f:
             self.prompt_template = f.read()
         self.tokenizer = None 
         self.model = None
@@ -61,7 +61,6 @@ class LlamaQA():
 
     # Llama conversation format으로 데이터 변환 
     def convert_squad_sample_to_llama_conversation(self, sample):
-        # get the question and context for this sample
         question = sample['question']
         context = sample['context']
         answers = sample['answers']['text']
@@ -93,7 +92,7 @@ class LlamaQA():
         conversation_datasets = datasets.map(self.convert_squad_sample_to_llama_conversation)
         conversation_datasets = conversation_datasets.map(self.get_base_and_tuned_bulk_predictions, batched=True, batch_size=5)
 
-        # Metric을 구할 수 있도록 Format을 맞춰줍니다.
+        # Metric을 구할 수 있도록 Format을 맞춰줌
         formatted_predictions = [{"id": sample["id"], "prediction_text": sample["predicted_answer"]} for sample in conversation_datasets]
 
         # prediction 결과 저장
