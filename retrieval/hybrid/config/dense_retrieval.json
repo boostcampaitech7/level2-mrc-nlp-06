@@ -12,7 +12,6 @@
     "epochs": 5,
     "learning_rate": 2e-5,
     "weight_decay": 1e-2,
-    "padding": true,
   "evaluate": true,
   "topk" : 1,
   "test_ks" : [1, 5, 10, 15, 20]
