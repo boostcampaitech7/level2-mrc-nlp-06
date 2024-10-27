@@ -50,7 +50,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", metavar=1, type=int, help="")
     parser.add_argument("--learning_rate", metavar=2e-5, type=float, help="")
     parser.add_argument("--weight_decay", metavar=1e-2, type=float, help="")
-    parser.add_argument("--padding", metavar=True, type=Union[bool, str], help="")
 
     parser.add_argument("--evaluate", metavar=True, type=bool, help="")
 
@@ -139,8 +138,6 @@ if __name__ == "__main__":
         q_encoder=q_encoder,
         p_encoder=p_encoder
     )
-
-    #retriever.padding = True
 
     # to save set the path
     if not model_name_or_path.startswith("../model/"):
