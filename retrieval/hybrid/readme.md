@@ -70,7 +70,7 @@ retriever = HybridRetrieval(
     )
 
 query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
-queries = [""대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?", "샤이닝 폼을 무엇이라고 칭하기도 하나요?"]
+queries = ["대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?", "샤이닝 폼을 무엇이라고 칭하기도 하나요?"]
 retriever.retrieve(retriever_type=retriever_type, query_or_dataset=query, topk=topk) # single query
 retriever.retrieve(retriever_type=retriever_type, query_or_dataset=queries, topk=topk) # multiple queries
 ```

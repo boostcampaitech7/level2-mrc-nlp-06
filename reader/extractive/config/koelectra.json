@@ -1,13 +1,12 @@
 {
     "model_args":{
-        "model_name_or_path":"uomnf97/klue-roberta-finetuned-korquad-v2",
+        "model_name_or_path":"monologg/koelectra-base-v3-finetuned-korquad",
         "config_name":null,
         "tokenizer_name":null,
-        "generation":false,
-        "retrieval_type":"dense"
+        "generation":false
     },
     "data_args":{
-        "dataset_name":"../data/datasets/v0.0.4",
+        "dataset_name":"../data/datasets/v0.0.1",
         "overwrite_cache":true,
         "preprocessing_num_workers":null,
         "max_seq_length":384,
@@ -25,8 +24,8 @@
         "eval_steps":50,
         "per_device_train_batch_size":8,
         "per_device_eval_batch_size":16,
-        "learning_rate":1e-5,
-        "num_train_epochs":3,
+        "learning_rate":2e-5,
+        "num_train_epochs":1,
         "warmup_steps":500,
         "logging_dir":"../logs",
         "logging_steps":500,
