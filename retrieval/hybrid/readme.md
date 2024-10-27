@@ -30,7 +30,6 @@ pprint
     "epochs": 5,
     "learning_rate": 2e-5,
     "weight_decay": 1e-2,
-    "padding": true,
   "evaluate": true, # eval mode on/off
   "topk" : 1, # extract top k documents 
   "test_ks" : [1, 5, 10, 15, 20] # test topk list
