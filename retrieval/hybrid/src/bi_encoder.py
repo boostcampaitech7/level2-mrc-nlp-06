@@ -55,7 +55,7 @@ class BiRetrieval:
         self.q_encoder = q_encoder
         self.p_encoder = p_encoder
 
-        self.padding= args.padding#"max_length"
+        self.padding= True #"max_length"
 
         self.prepare_in_batch_negative(num_neg=num_neg)
     
