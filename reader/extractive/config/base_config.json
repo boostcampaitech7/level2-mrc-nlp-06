@@ -19,7 +19,7 @@
         "use_faiss":false
     },
     "training_args":{
-        "output_dir":"/data/ephemeral/home/jh/level2-mrc-nlp-06/reader/extractive/models/outputs",
+        "output_dir":"/data/ephemeral/home/minji/reader/extractive/models/outputs",
         "evaluation_strategy":"no",
         "eval_steps":50,
         "per_device_train_batch_size":8,

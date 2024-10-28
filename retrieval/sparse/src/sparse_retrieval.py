@@ -28,10 +28,10 @@ from pymilvus.model.sparse import SpladeEmbeddingFunction
 # 2단계 상위 경로를 시스템 경로에 추가
 # print(os.path.join(os.getcwd(),"retrieval","sparse"))
 # sys.path.append(os.path.join(os.getcwd(),"retrieval","sparse"))
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # from utils_sparse_retrieval import timer, hit, mrr
-from utils.utils_sparse_retrieval import timer, hit, mrr
+# from utils_sparse_retrieval import timer, hit, mrr
 
 # logger 지정
 logging.basicConfig(
@@ -42,6 +42,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from contextlib import contextmanager
+import time
+
+
+@contextmanager
+def timer(name):
+    t0 = time.time()  # 시작 시간 기록
+    try:
+        yield  # 코드 실행
+    finally:
+        elapsed = time.time() - t0  # 경과 시간 계산
+        print(f"[{name}] done in {elapsed:.3f} s")  # 경과 시간 출력
 
 # TF-IDF, BM25 알고리즘으로 문서 검색
 class SparseRetrieval: 
