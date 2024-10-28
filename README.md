@@ -46,18 +46,17 @@
 - **Ensemble**: Hard voting
 
 
-## 5. 설치 및 사용법
-### 5-1. 개발 환경
+## 5. 개발 환경
 - **Hardware**: Tesla V100 GPU (4 servers)
 - **Software**: Linux, Git, Python (3.10.15 버전)
 - **협업 도구**: 
     - Github: 진행 상황 추적 및 코드 버전 관리
     - Confluence: 프로젝트 단위 작업 결과 기록
 
-### 5-2. 설치 및 실행
+## 6. 설치 및 사용법
 아래의 실행 방법은 최상위 폴더 기준입니다. 구체적인 내용은 [ODQA README](./ODQA/README.md)를 참조하세요.
 
-#### 1. 필수 라이브러리 설치
+### 1) 필수 라이브러리 설치
 ```python
 # 필수 라이브러리 설치
 pip install -r requirements.txt
@@ -66,14 +65,14 @@ pip install -r requirements.txt
 bash install_mecab.sh
 ```
 
-#### 2. Sparse Retrieval 임베딩 파일 생성
+### 2) Sparse Retrieval 임베딩 파일 생성
 - `sparse_train.sh` 스크립트 실행
 
 ```bash
 bash sparse_train.sh
 ```
 
-#### 3. Reader 모델 학습
+### 3) Reader 모델 학습
 - Extractive 모델 학습은 `train_mrc.sh` 스크립트를 사용하며, `--type=ext` 옵션을 포함해야 합니다.
 - 자세한 설정 방법은 [Extractive README](./reader/extractive/README.md)를 참조하세요.
 
@@ -81,7 +80,7 @@ bash sparse_train.sh
 bash train_mrc.sh --type=ext --do_eval
 ```
 
-#### 3. inference 실행
+### 4) inference 실행
 - ODQA 모델을 테스트하려면 `inference.sh` 스크립트를 실행합니다.
 - 평가 모드로 실행하려면 `--do_eval` 옵션을 추가하고, 예측 결과 저장 시 `--do_predict` 옵션을 사용합니다.
 - 자세한 설정 방법은 [ODQA README](./ODQA/README.md)를 참조하세요.
@@ -94,25 +93,25 @@ bash inference.sh --qa ext --retrieval sparse --do_eval
 bash inference.sh --qa ext --retrieval sparse --do_predict
 ```
 
-## 6. 코드 구조
+## 7. 코드 구조
 ```text
 level2-mrc-nlp-06
-├── EDA_team_folder      # EDA 수행 노트북 파일
-├── data_preprocessing   # 데이터 전처리
-├── data_augmentation    # 데이터 증강
-├── retrieval            # Retrieve 모델 관련 코드
+├── EDA_team_folder        # EDA 수행 노트북 파일
+├── data_preprocessing     # 데이터 전처리
+├── data_augmentation      # 데이터 증강
+├── retrieval              # Retrieve 모델 관련 코드
 │   ├── sparse
 │   ├── dense
 │   └── hybrid
-├── reader               # Reader 모델 관련 코드
+├── reader                 # Reader 모델 관련 코드
 │   ├── abstractive
 │   ├── extractive
 │   └── utils
-├── ODQA                 # ODQA 추론 코드
-├── ODQA2                # Retrieval과 Reader에 서로 다른 버전의 데이터셋 적용 가능 ODQA 추론 코드
-├── sparse_train.sh      # Sparse Retrieval 임베딩 생성을 위한 실행 스크립트
-├── train_mrc.sh         # Reader 모델 fine-tuning을 위한 실행 스크립트
-├── inference.sh         # 전체 ODQA 수행을 통해 평가 및 예측을 위한 실행 스크립트
+├── ODQA                   # ODQA 추론 코드
+├── ODQA2                  # Retrieval과 Reader에 서로 다른 버전의 데이터셋 적용 가능 ODQA 추론 코드
+├── sparse_train.sh        # Sparse Retrieval 임베딩 생성을 위한 실행 스크립트
+├── train_mrc.sh           # Reader 모델 fine-tuning을 위한 실행 스크립트
+├── inference.sh           # 전체 ODQA 수행을 통해 평가 및 예측을 위한 실행 스크립트
 ├── README.md
 ├── assets
 └── requirements.txt
