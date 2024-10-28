@@ -57,9 +57,6 @@
 ### 5-2. 설치 및 실행
 아래의 실행 방법은 최상위 폴더 기준입니다. 구체적인 내용은 [ODQA README](./ODQA/README.md)를 참조하세요.
 
-모두 최상위 폴더를 기준으로 실행합니다. 자세한 내용은 [ODQA README](./ODQA/README.md)를 참조하세요.
-Retrieval, Reader 모델에 대해 다양한 옵션을 테스트했고, 각각은 각 폴더의 README 파일을 참고해 실행 및 테스트할 수 있습니다. 최종 ODQA 모델에서는 각 방법 중 리더보드에서 우수한 성능 보인 Sparse Retrieval 및 Extractive Reader을 중심으로 추론 진행합니다. 여기에서는 이 방법론을 이용한 최종 추론 코드 실행 방법을 제시합니다.
-
 #### 1. 필수 라이브러리 설치
 ```python
 # 필수 라이브러리 설치
@@ -98,7 +95,6 @@ bash inference.sh --qa ext --retrieval sparse --do_predict
 ```
 
 ## 6. 코드 구조
-- TBU
 ```text
 level2-mrc-nlp-06
 ├── EDA_team_folder      # EDA 수행 노트북 파일
@@ -113,7 +109,7 @@ level2-mrc-nlp-06
 │   ├── extractive
 │   └── utils
 ├── ODQA                 # ODQA 추론 코드
-├── ODQA2                # Retrieval과 Reader에 서로 다른 버전의 전처리 데이터셋 적용 가능하도록 구분한 ODQA 추론 코드
+├── ODQA2                # Retrieval과 Reader에 서로 다른 버전의 데이터셋 적용 가능 ODQA 추론 코드
 ├── sparse_train.sh      # Sparse Retrieval 임베딩 생성을 위한 실행 스크립트
 ├── train_mrc.sh         # Reader 모델 fine-tuning을 위한 실행 스크립트
 ├── inference.sh         # 전체 ODQA 수행을 통해 평가 및 예측을 위한 실행 스크립트
