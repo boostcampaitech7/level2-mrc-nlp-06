@@ -557,7 +557,13 @@ class HybridRetrieval:
             "hit@k": [hit_k],
             "mrr@k": [mrr_k]
         })
-
+        
+        # 저장할 폴더 경로를 지정
+        output_dir = '../outputs/'
+        # 폴더가 존재하지 않으면 생성
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         df.to_csv(f'../outputs/output_{retriever_name}_topk_{topk}.csv', index=False)
         
         print(f"@@@@@@@@@@@@@@@@@@@@@@@@@  {retriever_type} done  @@@@@@@@@@@@@@@@@@@@@@@@@\n") 

@@ -1,200 +1,118 @@
 # Open-Domain Question Answering 프로젝트
-> 주어진 Open-Domain 질문에 대해 정확한 답변을 생성하는 모델을 개발하는 프로젝트이다. 
+> 주어진 Open-Domain 질문에 대해 정확한 답변을 생성하는 모델을 개발하는 프로젝트입니다.
 > 
-> 네이버 커넥트재단 부스트캠프 AI Tech 7기 NLP 과정의 일환으로써 3주간 진행했다 _(진행기간: 2024.10.02 ~ 2024.10.24)_
+> 네이버 커넥트재단 부스트캠프 AI Tech 7기 NLP 과정의 일환으로 3주간 진행했습니다. _(진행기간: 2024.10.02 ~ 2024.10.24)_
 
 ## 1. 프로젝트 개요
-- 프로젝트 내용 및 목표
-- Wrap-Up Report (TBU: 링크 추가 예정)
+![ODQA 모델 흐름도](./assets/odqa_flowchart.png)
 
-## 팀 소개
+- **주제**: 미리 구축된 Knowledge Resource를 기반으로 2단계(2-Stage)의 ODQA 모델을 설계하여, Retrieval 단계에서 적합한 문서를 찾아내고, Reader 단계에서 답변을 생성합니다.
+- **평가기준**: Exact Match (EM), F1-Score
+- [Wrap-Up Report](./assets/wrapup_report.pdf)
 
-| 이름  | 담당 역할                                                                                                                                           |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [서태영](https://github.com/sty0507) | 데이터 전처리(Wikipedia), 데이터 증강 (GPT-4o Prompting)                                                                                                   |
-| [오수현](https://github.com/ocean010315) | DPR (SBERT) 구현 및 실험, Generative Reader 실험 (GPT-4o Prompting), Extractive Reader 실험 (KorQuad FineTuning)                                         |
-| [이상의](https://github.com/LeSaUi) | 데이터 전처리 (QA Data), Hybrid Retrieval 구현 및 실험                                                                                                     |
-| [이정인](https://github.com/leeennn) | 데이터 전처리(Context), 데이터 증강 (AEDA)                                                                                                            |
-| [이정휘](https://github.com/LeeJeongHwi) | Inference 구현, Extractive Reader 실험, Ensemble 구현                                                                                                 |
-| [정민지](https://github.com/minjijeong98) | Sparse Retrieval 구현 및 실험 (TF-IDF, BM25, BGE-M3, SPLADE), 벡터DB 구축 및 실험, Generative Reader 구현 및 실험(Llama 3.1 Instruction tuning), Github 사용 환경 세팅 |
 
-## 성과
-EM(Exact Match) 점수 66.11% 달성 (Baseline 33.06% 대비 33.05%p 개선)
+
+## 2. 팀 소개
+
+| 이름 | 담당 역할 |
+| --- | --- |
+| 서태영 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/sty0507) | 데이터 전처리(Wikipedia), 데이터 증강 (GPT-4o Prompting) |
+| 오수현 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/ocean010315) | DPR (SBERT) 구현 및 실험, Generative Reader 실험 (GPT-4o Prompting), Extractive Reader 실험 (KorQuAD FineTuning) |
+| 이상의 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/LeSaUi) | 데이터 전처리 (QA Data), Hybrid Retrieval 구현 및 실험 |
+| 이정인 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/leeennn) | 데이터 전처리(Context), 데이터 증강 (AEDA) |
+| 이정휘 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/LeeJeongHwi) | Inference 구현, Extractive Reader 실험, Ensemble 구현 |
+| 정민지 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/minjijeong98) | Sparse Retrieval 구현 및 실험 (TF-IDF, BM25, BGE-M3, SPLADE), 벡터DB 구축 및 실험, Generative Reader 구현 및 실험(Llama 3.1 Instruction tuning), Github 사용 환경 세팅 |
+
+
+
+
+## 3. 성과
+최종 리더보드에서 EM(Exact Match) 점수 **66.11%** 달성 _(Baseline 33.06% 대비 **33.05%p 개선**)_
 
 ![리더보드 결과](/assets/leaderboard_score.png)
-_최종 리더보드 결과 (EM 66.11% 달성)_
 
-## 주요 접근 방법
-- 데이터
+
+## 4. 주요 접근 방법
+- **데이터**
 	- [데이터 분석](./EDA_team_folder/) 및 [전처리](./data_preprocessing/): 개행(`\n`), 마크다운 문법, 외국어 전처리 및 실험
 	- [데이터 증강](./data_augmentation/): AEDA, OpenAI GPT-4o 프롬프트 튜닝
-- Retrieval model
+- **Retrieval model**
 	- [Sparse](./retrieval/sparse/README.md): TF-IDF, BM25, BGE-M3, SPLADE
 	- [Dense](./retrieval/dense/README.md): Bi-Encoder, Cross-Encoder, 2-stage retrieval
-	- [Hybrid](./retrieval/hybrid/readme.md): re-rank, hybrid appraoch
-- Reader Model 
+	- [Hybrid](./retrieval/hybrid/readme.md): re-rank, hybrid approach
+- **Reader Model**
 	- [Extractive](./reader/extractive/README.md): BERT, RoBERTa, KoELECTRA fine-tuning
-	- [Abstractive](./reader/abstractive/): GPT-4o Prompt Tuning, Llama-3.1-8B Instruction Tuning (Q-LoRA)
-- Ensemble: Hard voting
-
-#### 3. 기술 스택
+	- [Abstractive](./reader/abstractive/): GPT-4o Prompt Tuning, Llama-3.1-8B Q-LoRA Instruction Tuning
+- **Ensemble**: Hard voting
 
 
+## 5. 개발 환경
+- **Hardware**: Tesla V100 GPU (4 servers)
+- **Software**: Linux, Git, Python (3.10.15 버전)
+- **협업 도구**: 
+    - Github: 진행 상황 추적 및 코드 버전 관리
+    - Confluence: 프로젝트 단위 작업 결과 기록
 
-## 설치 및 사용법
-- 사용한 언어와 버전: Python 3.10.15
-- 프로젝트 설치하는 방법 (requirements)
+## 6. 설치 및 사용법
+아래의 실행 방법은 최상위 폴더 기준입니다. 구체적인 내용은 [ODQA README](./ODQA/README.md)를 참조하세요.
 
-모두 최상위 폴더를 기준으로 실행합니다.
-
-#### 1. `requirements.txt`에서 필요한 라이브러리 추가
+### 1) 필수 라이브러리 설치
 ```python
+# 필수 라이브러리 설치
 pip install -r requirements.txt
+
+# konlpy.tag의 Mecab() 토크나이저 설치
+bash install_mecab.sh
 ```
 
-#### 2. Retrieval 모델 학습 / 임베딩 파일 생성
-- Sparse: `sparse_train.sh` 실행
-    - `sparse_train.sh`에서 `--config` 설정
-    - sparse config는 `/retrieval/sparse/config` 에 config 생성 후 사용
-    - 실행이 끝나면 `/retrieval/sparse/model` 에 `.bin`파일이 생성 됨
-- Dense: `/retrieval/dense/README` 참조
+### 2) Sparse Retrieval 임베딩 파일 생성
+- `sparse_train.sh` 스크립트 실행
 
-#### 3. Reader 모델 학습
-- Extractive: `train_mrc.sh` 실행
-    - 필수 인자로 `--type=ext`를 주어야함
-    - `train_mrc.sh` 내 `config_name` 수정
-        - `config_name`의 경우 `/reader/extractive/config/{filename}`로 전달해야함
-        - config 파일 생성 후 datasets, output_dir 경로 설정 필수
-    - Evaluation을 진행하는 경우
-        - `bash train_mrc.sh --type=ext --do_eval` 로 실행
+```bash
+bash sparse_train.sh
+```
 
-#### 3. inference 실행
-- `inference.sh` 실행
-    - `ODQA/config` 파일 설정
-        - `qa_config`는 reader 모델의 config 위치로 설정
-        - `retrieval_config`는 사용했던 config 파일 이름으로 설정
-        - `datasets` 는 데이터셋 경로로 설정
-    - Evaluation (Validation case)만 진행하는 경우
-        - `bash inference.sh --qa ext --retrieval sparse --do_eval`
-    - Predictions를 저장하고 싶은 경우
-        - `bash inference.sh --qa ext --retrieval sparse --do_predict`
-        - `bash inference.sh --qa ext --retrieval sparse --do_predict --do_valid` (Validation 결과도 같이 저장)
+### 3) Reader 모델 학습
+- Extractive 모델 학습은 `train_mrc.sh` 스크립트를 사용하며, `--type=ext` 옵션을 포함해야 합니다.
+- 자세한 설정 방법은 [Extractive README](./reader/extractive/README.md)를 참조하세요.
 
+```bash
+bash train_mrc.sh --type=ext --do_eval
+```
 
-## 협업 방식
-#### Github
-- issue, pr 템플릿 (링크 추가)
-- 커밋 룰
-- 브랜치 전략
+### 4) inference 실행
+- ODQA 모델을 테스트하려면 `inference.sh` 스크립트를 실행합니다.
+- 평가 모드로 실행하려면 `--do_eval` 옵션을 추가하고, 예측 결과 저장 시 `--do_predict` 옵션을 사용합니다.
+- 자세한 설정 방법은 [ODQA README](./ODQA/README.md)를 참조하세요.
 
-#### Confluence 
-- 예시 이미지 추가
+```bash
+# 평가 모드
+bash inference.sh --qa ext --retrieval sparse --do_eval
 
+# 예측 결과 저장
+bash inference.sh --qa ext --retrieval sparse --do_predict
+```
 
-## 4. 소스코드 구조
-- TBU
+## 7. 코드 구조
 ```text
-.
-├── EDA_team_folder
-│   ├── lji_AEDA.ipynb
-│   ├── lji_EDA_language.ipynb
-│   ├── lji_processing.ipynb
-│   ├── lsu_EDA.ipynb
-│   ├── minji_EDA.ipynb
-│   ├── sty_EDA.ipynb
-│   └── tokenizer_eda_jh.ipynb
-├── ODQA
-│   ├── README.md
-│   ├── config
-│   │   └── base_config.json
-│   ├── ensemble.py
-│   ├── inference.py
-│   ├── modules
-│   │   ├── __init__.py
-│   │   ├── denseRetrieval.py
-│   │   ├── extractiveQA.py
-│   │   └── spraseRetrieval.py
-│   └── utils_common.py
-├── ODQA2
-│   ├── README.md
-│   ├── config
-│   │   └── inference_config.json
-│   ├── extractiveQA.py
-│   └── inference.py
+level2-mrc-nlp-06
+├── EDA_team_folder        # EDA 수행 노트북 파일
+├── data_preprocessing     # 데이터 전처리
+├── data_augmentation      # 데이터 증강
+├── retrieval              # Retrieve 모델 관련 코드
+│   ├── sparse
+│   ├── dense
+│   └── hybrid
+├── reader                 # Reader 모델 관련 코드
+│   ├── abstractive
+│   ├── extractive
+│   └── utils
+├── ODQA                   # ODQA 추론 코드
+├── ODQA2                  # Retrieval과 Reader에 서로 다른 버전의 데이터셋 적용 가능 ODQA 추론 코드
+├── sparse_train.sh        # Sparse Retrieval 임베딩 생성을 위한 실행 스크립트
+├── train_mrc.sh           # Reader 모델 fine-tuning을 위한 실행 스크립트
+├── inference.sh           # 전체 ODQA 수행을 통해 평가 및 예측을 위한 실행 스크립트
 ├── README.md
 ├── assets
-│   └── leaderboard_score.png
-├── data_augmentation
-│   └── Prompting
-│       └── data_augmentation.ipynb
-├── data_preprocessing
-│   ├── train_preprocessing.ipynb
-│   └── train_preprocessing.py
-├── inference.sh
-├── reader
-│   ├── abstractive
-│   │   ├── config
-│   │   │   └── base_gen_config.json
-│   │   └── src
-│   │       ├── __init__.py
-│   │       └── train_abs.py
-│   ├── extractive
-│   │   ├── README.md
-│   │   ├── config
-│   │   │   ├── base_config.json
-│   │   │   └── koelectra.json
-│   │   └── src
-│   │       ├── __init__.py
-│   │       ├── train_ext.py
-│   │       └── trainer_ext.py
-│   └── utils
-│       ├── __init__.py
-│       ├── preprocessing.py
-│       └── utils_mrc.py
-├── retrieval
-│   ├── dense
-│   │   ├── README.md
-│   │   ├── config
-│   │   │   ├── 2-stages.json
-│   │   │   ├── bi_encoder.json
-│   │   │   └── cr_encoder.json
-│   │   ├── src
-│   │   │   ├── run_sbert.py
-│   │   │   └── sbert.py
-│   │   ├── test.py
-│   │   └── utils
-│   │       └── sbert_utils.py
-│   ├── hybrid
-│   │   ├── config
-│   │   │   ├── dense_retrieval.json
-│   │   │   └── hybrid_retrieval.json
-│   │   ├── readme.md
-│   │   ├── src
-│   │   │   ├── bi_encoder.py
-│   │   │   ├── hybrid_retrieval.py
-│   │   │   ├── run_hybrid_retrieval.py
-│   │   │   ├── run_hybrid_retrieval_test.py
-│   │   │   └── train_dense_retrieval.py
-│   │   └── utils
-│   │       └── utils.py
-│   └── sparse
-│       ├── README.md
-│       ├── config
-│       │   ├── config_bgem3.json
-│       │   ├── config_bm25.json
-│       │   ├── config_splade.json
-│       │   ├── config_tfidf.json
-│       ├── src
-│       │   ├── run_sparse_retrieval.py
-│       │   └── sparse_retrieval.py
-│       └── utils
-│           └── utils_sparse_retrieval.py
-├── sparse_train.sh
-├── train_mrc.sh
-└── train_preprocessing.ipynb
+└── requirements.txt
 ```
-
-
-
-### Reference 
-- TBU
