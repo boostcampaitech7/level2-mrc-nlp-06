@@ -27,7 +27,8 @@
 └── src
     ├── __init__.py
     ├── train_abs.py
-    └── train_llama.py
+    ├── train_llama.py
+    └── gpt.py
 ```
 
 
@@ -52,6 +53,21 @@ python src/train_llama.py --config {config_file_name}
 ### outputs
 - fine-tuned `llama` 모델의 adapter layer 가중치와 validation 데이터에 대한 predictions 결과는 config 파일에서 지정한 `output_dir`에 저장됩니다.
 
+### `gpt.py` 사용법
+- GPT API key 필요
+
+**valid 수행 시**  
+  - ./reader/abstractive/src/gpt.py의 line 12에 validation dataset이 있는 **폴더 경로** 입력  
+
+**test 수행 시**  
+1. Sparse Retrieval 수행 후 탐색한 문서의 document_id들이 포함된 `outputs{type}.csv`가 필요  
+2. ./reader/abstractive/src/gpt.py의 line 12, 13에 각각 wikipedia_documents.json이 있는 **폴더 경로**와 이전 단계에서 생성한 outputs{type}.csv의 **파일 경로** 입력  
+```bash
+python gpt.py --type {valid/test} --key {api key}
+```
+
+**주의사항**  
+위 터미널 명령어를 실행하는 위치에 따라 파일들의 상대적인 경로가 달라질 수 있습니다. 따라서 ./reader/abstractive/src로 실행 경로를 설정하시고, 해당 경로를 기준으로 데이터셋과 csv 파일의 경로를 설정하시는 것을 추천드립니다.
 
 ## Reference
 - [Fine Tuning Llama 3.2 11B for Question Answering](https://medium.com/@coldstart_coder/fine-tuning-llama-3-2-11b-for-question-answering-435c28bb57c1)
