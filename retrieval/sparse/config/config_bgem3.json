@@ -1,0 +1,11 @@
+{
+    "corpus_data_path": "/data/ephemeral/home/datasets/v0.0.1/wikipedia_documents.json",
+    "embedding_method": "bge-m3",
+    "bgem3_type": "dense",
+    "dense_metric_type": "IP",
+    "embedding_model_name": "BAAI/bge-m3",
+    "collection_name": "collection_bge_BAAI_IP",
+    "topk": 10,
+    "eval_data_path": "/data/ephemeral/home/datasets/v0.0.1",
+    "eval_metric": ["hit", "mrr"]
+}

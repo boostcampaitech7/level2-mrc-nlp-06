@@ -1,0 +1,14 @@
+{
+    "encoder_type": "bi-encoder",
+    "data_path": "../../../data/datasets/v0.0.1",
+    "task": "train",
+    "model": {
+        "name": "snunlp/KR-SBERT-V40K-klueNLI-augSTS",
+        "epochs": 5,
+        "batch_size": 32,
+        "lr": 2e-5,
+        "weight_decay": 0.01,
+        "data_type": "valid",
+        "topk": 5
+    }
+}

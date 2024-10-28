@@ -1,0 +1,18 @@
+{
+  "wiki_path": "../../../../../data/wikipedia_documents.json",
+  "data_path": "../../../../../data/",
+    "train_folder": "train_dataset/",
+    "eval_folder": "eval_dataset/",
+  "model_name_or_path": "klue/bert-base",
+  "train": true,
+    "train_samples": false,
+    "num_samples": 10,
+    "batch_size": 8,
+    "num_neg": 2,
+    "epochs": 5,
+    "learning_rate": 2e-5,
+    "weight_decay": 1e-2,
+  "evaluate": true,
+  "topk" : 1,
+  "test_ks" : [1, 5, 10, 15, 20]
+}
