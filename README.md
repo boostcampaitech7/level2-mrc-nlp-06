@@ -11,17 +11,17 @@
 - [Wrap-Up Report](./assets/wrapup_report.pdf)
 
 
+
 ## 2. 팀 소개
 
-| 이름           | 담당 역할                                                                                                                                           |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 서태영 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/sty0507) | 데이터 전처리(Wikipedia), 데이터 증강 (GPT-4o Prompting)                                                                                                   |
-| 오수현 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/ocean010315) | DPR (SBERT) 구현 및 실험, Generative Reader 실험 (GPT-4o Prompting), Extractive Reader 실험 (KorQuAD FineTuning)                                         |
-| 이상의 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/LeSaUi) | 데이터 전처리 (QA Data), Hybrid Retrieval 구현 및 실험                                                                                                     |
-| 이정인 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/leeennn) | 데이터 전처리(Context), 데이터 증강 (AEDA)                                                                                                            |
-| 이정휘 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/LeeJeongHwi) | Inference 구현, Extractive Reader 실험, Ensemble 구현                                                                                                 |
-| 정민지 ![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)[ ](https://github.com/minjijeong98) | Sparse Retrieval 구현 및 실험 (TF-IDF, BM25, BGE-M3, SPLADE), 벡터DB 구축 및 실험, Generative Reader 구현 및 실험(Llama 3.1 Instruction tuning), Github 사용 환경 세팅 |
-
+| 이름 | 담당 역할 |
+| --- | --- |
+| 서태영 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/sty0507) | 데이터 전처리(Wikipedia), 데이터 증강 (GPT-4o Prompting) |
+| 오수현 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/ocean010315) | DPR (SBERT) 구현 및 실험, Generative Reader 실험 (GPT-4o Prompting), Extractive Reader 실험 (KorQuAD FineTuning) |
+| 이상의 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/LeSaUi) | 데이터 전처리 (QA Data), Hybrid Retrieval 구현 및 실험 |
+| 이정인 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/leeennn) | 데이터 전처리(Context), 데이터 증강 (AEDA) |
+| 이정휘 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/LeeJeongHwi) | Inference 구현, Extractive Reader 실험, Ensemble 구현 |
+| 정민지 [![GitHub](https://img.icons8.com/material-outlined/24/000000/github.png)](https://github.com/minjijeong98) | Sparse Retrieval 구현 및 실험 (TF-IDF, BM25, BGE-M3, SPLADE), 벡터DB 구축 및 실험, Generative Reader 구현 및 실험(Llama 3.1 Instruction tuning), Github 사용 환경 세팅 |
 
 
 
