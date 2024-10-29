@@ -26,15 +26,18 @@ import pickle
 
 logger = logging.getLogger(__name__)
 
+
 @contextmanager
 def timer(name):
     t0 = time.time()
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
+
 def load_pickle(path):
     with open(path, "rb") as file:
         return pickle.load(file)
+
 
 def save_pickle(target, path):
     with open(path, "wb") as file:

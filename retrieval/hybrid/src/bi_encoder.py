@@ -21,8 +21,9 @@ from pprint import pprint
 
 
 seed = 2024
-random.seed(seed) # python random seed 고정
-np.random.seed(seed) # numpy random seed 고정
+random.seed(seed)  # python random seed 고정
+np.random.seed(seed)  # numpy random seed 고정
+
 
 class BertEncoder(BertPreTrainedModel):
     def __init__(self, config):
@@ -32,15 +33,16 @@ class BertEncoder(BertPreTrainedModel):
         self.init_weights()
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
-        
-        outputs = self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
-         
-        return outputs[1] # pooled_output
 
+        outputs = self.bert(
+            input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids
+        )
+
+        return outputs[1]  # pooled_output
 
 
 class BiRetrieval:
-    def __init__(self, args, dataset, num_neg, tokenizer, q_encoder ,p_encoder):
+    def __init__(self, args, dataset, num_neg, tokenizer, q_encoder, p_encoder):
 
         self.args = args
         self.dataset = dataset
@@ -55,17 +57,21 @@ class BiRetrieval:
         self.q_encoder = q_encoder
         self.p_encoder = p_encoder
 
-        self.padding= True #"max_length"
+        self.padding = True  # "max_length"
 
         self.prepare_in_batch_negative(num_neg=num_neg)
-    
+
     def prepare_train_dataset(self):
         train_dataset = None
-        self.train_dataloader = DataLoader(train_dataset, batch_size=self.args.per_device_train_batch_size)
-    
+        self.train_dataloader = DataLoader(
+            train_dataset, batch_size=self.args.per_device_train_batch_size
+        )
+
     def prepare_eval_dataset(self):
         eval_dataset = None
-        self.eval_dataloader = DataLoader(eval_dataset, batch_size=self.args.per_device_train_batch_size)
+        self.eval_dataloader = DataLoader(
+            eval_dataset, batch_size=self.args.per_device_train_batch_size
+        )
 
     def prepare_in_batch_negative(self, num_neg=2):
 
@@ -90,20 +96,34 @@ class BiRetrieval:
 
                     break
 
-        q_seqs = tokenizer(dataset["question"], padding=padding, truncation=True, return_tensors="pt")
-        p_seqs = tokenizer(p_with_neg, padding=padding, truncation=True, return_tensors="pt")
-        
-        max_len = p_seqs["input_ids"].size(-1)
-        p_seqs["input_ids"] = p_seqs["input_ids"].view(-1, num_neg + 1, max_len)
-        p_seqs["attention_mask"] = p_seqs["attention_mask"].view(-1, num_neg + 1, max_len)
-        p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(-1, num_neg + 1, max_len)
-
-        train_dataset = TensorDataset(
-            q_seqs["input_ids"], q_seqs["attention_mask"], q_seqs["token_type_ids"],
-            p_seqs["input_ids"], p_seqs["attention_mask"], p_seqs["token_type_ids"]
+        q_seqs = tokenizer(
+            dataset["question"], padding=padding, truncation=True, return_tensors="pt"
+        )
+        p_seqs = tokenizer(
+            p_with_neg, padding=padding, truncation=True, return_tensors="pt"
         )
 
-        self.train_dataloader = DataLoader(train_dataset, batch_size=self.args.per_device_train_batch_size)
+        max_len = p_seqs["input_ids"].size(-1)
+        p_seqs["input_ids"] = p_seqs["input_ids"].view(-1, num_neg + 1, max_len)
+        p_seqs["attention_mask"] = p_seqs["attention_mask"].view(
+            -1, num_neg + 1, max_len
+        )
+        p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(
+            -1, num_neg + 1, max_len
+        )
+
+        train_dataset = TensorDataset(
+            q_seqs["input_ids"],
+            q_seqs["attention_mask"],
+            q_seqs["token_type_ids"],
+            p_seqs["input_ids"],
+            p_seqs["attention_mask"],
+            p_seqs["token_type_ids"],
+        )
+
+        self.train_dataloader = DataLoader(
+            train_dataset, batch_size=self.args.per_device_train_batch_size
+        )
 
     def set_optimizer_and_scheduler(self):
         args = self.args
@@ -113,15 +133,51 @@ class BiRetrieval:
 
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_params = [
-            {"params": [p for n, p in q_encoder.named_parameters() if not any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
-            {"params": [p for n, p in q_encoder.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
-            {"params": [p for n, p in p_encoder.named_parameters() if not any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
-            {"params": [p for n, p in p_encoder.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
+            {
+                "params": [
+                    p
+                    for n, p in q_encoder.named_parameters()
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": args.weight_decay,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in q_encoder.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in p_encoder.named_parameters()
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": args.weight_decay,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in p_encoder.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+            },
         ]
-        optimizer = AdamW(optimizer_grouped_params, lr=args.learning_rate, eps=args.adam_epsilon)
+        optimizer = AdamW(
+            optimizer_grouped_params, lr=args.learning_rate, eps=args.adam_epsilon
+        )
 
-        t_total = len(self.train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total)
+        t_total = (
+            len(self.train_dataloader)
+            // args.gradient_accumulation_steps
+            * args.num_train_epochs
+        )
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
+        )
 
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -135,17 +191,17 @@ class BiRetrieval:
         q_inputs = {
             "input_ids": batch[0].to(device),
             "attention_mask": batch[1].to(device),
-            "token_type_ids": batch[2].to(device)
+            "token_type_ids": batch[2].to(device),
         }
 
         p_inputs = {
             "input_ids": batch[3].view(batch_size * sample_size, -1).to(device),
             "attention_mask": batch[4].view(batch_size * sample_size, -1).to(device),
-            "token_type_ids": batch[5].view(batch_size * sample_size, -1).to(device)
+            "token_type_ids": batch[5].view(batch_size * sample_size, -1).to(device),
         }
 
         return q_inputs, p_inputs
-    
+
     def compute_loss_cos_sim(self, q_outputs, p_outputs, targets):
 
         batch_size = q_outputs.shape[0]
@@ -155,12 +211,12 @@ class BiRetrieval:
 
         p_positive_outputs = p_outputs[:, :1, :]
         p_negative_outputs = p_outputs[:, 1:, :]
-        
+
         triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
         loss = triplet_loss(q_outputs, p_positive_outputs, p_negative_outputs)
 
         return loss
-    
+
     def compute_loss_nll(self, q_outputs, p_outputs, targets):
 
         batch_size = q_outputs.shape[0]
@@ -186,7 +242,7 @@ class BiRetrieval:
         self.set_optimizer_and_scheduler()
         optimizer, scheduler = self.optimizer, self.scheduler
 
-        #global_step = 0
+        # global_step = 0
 
         q_encoder.train()
         p_encoder.train()
@@ -196,7 +252,7 @@ class BiRetrieval:
         동일한 경우: 모델의 모든 파라미터가 하나의 옵티마이저에 포함되어 있다면, model.zero_grad()와 optimizer.zero_grad()는 동일하게 동작합니다.
         다른 경우: 모델의 파라미터가 여러 옵티마이저에 분산되어 있는 경우, model.zero_grad()를 사용하는 것이 더 안전합니다. 이는 모든 파라미터의 그래디언트를 초기화하기 때문입니다.
         """
-        
+
         q_encoder.zero_grad()
         p_encoder.zero_grad()
         torch.cuda.empty_cache()
@@ -215,7 +271,9 @@ class BiRetrieval:
 
                     q_outputs = q_encoder(**q_inputs)
                     p_outputs = p_encoder(**p_inputs)
-                    targets = torch.zeros(batch_size).long().to(args.device) # positive example is always first
+                    targets = (
+                        torch.zeros(batch_size).long().to(args.device)
+                    )  # positive example is always first
 
                     loss = self.compute_loss_nll(q_outputs, p_outputs, targets)
                     loss.backward()
@@ -226,10 +284,9 @@ class BiRetrieval:
 
                     del q_inputs, p_inputs
                     torch.cuda.empty_cache()
-                    
-                    
+
                     tepoch.set_postfix(loss=f"{str(loss.item())}")
-                    #global_step += 1
+                    # global_step += 1
 
     def eval(self):
         args = self.args
@@ -241,7 +298,7 @@ class BiRetrieval:
         self.set_optimizer_and_scheduler()
         optimizer, scheduler = self.optimizer, self.scheduler
 
-        #global_step = 0
+        # global_step = 0
 
         q_encoder.eval()
         p_encoder.eval()
@@ -259,12 +316,14 @@ class BiRetrieval:
 
                         q_outputs = q_encoder(**q_inputs)
                         p_outputs = p_encoder(**p_inputs)
-                        targets = torch.zeros(batch_size).long().to(args.device) # positive example is always first
+                        targets = (
+                            torch.zeros(batch_size).long().to(args.device)
+                        )  # positive example is always first
 
                         loss = self.compute_loss(q_outputs, p_outputs, targets)
 
                         tepoch.set_postfix(loss=f"{str(loss.item())}")
-                        #global_step += 1
+                        # global_step += 1
 
     def from_pretrained(self, model_path):
         self.tokenizer.from_pretrained(f"{model_path}/tokenizer/")
@@ -276,10 +335,8 @@ class BiRetrieval:
         self.q_encoder.save_pretrained(f"{model_path}/q/")
         self.p_encoder.save_pretrained(f"{model_path}/p/")
 
-
-
     def get_relevant_doc(self, query, topk=1):
-        
+
         device = self.args.device
         tokenizer = self.tokenizer
         padding = self.padding
@@ -293,24 +350,31 @@ class BiRetrieval:
         q_encoder.eval()
         p_encoder.eval()
         with torch.no_grad():
-            if isinstance(query, str):query = [query]
-            q_seqs_val = tokenizer(query, padding=padding, truncation=True, return_tensors="pt").to(device)
-            q_emb = q_encoder(**q_seqs_val)#.to("cpu")
+            if isinstance(query, str):
+                query = [query]
+            q_seqs_val = tokenizer(
+                query, padding=padding, truncation=True, return_tensors="pt"
+            ).to(device)
+            q_emb = q_encoder(**q_seqs_val)  # .to("cpu")
 
             p_embs = []
             for p in self.corpus:
-                p = tokenizer(p, padding=padding, truncation=True, return_tensors="pt").to(device)
-                p_emb = p_encoder(**p)#.to("cpu").numpy()
+                p = tokenizer(
+                    p, padding=padding, truncation=True, return_tensors="pt"
+                ).to(device)
+                p_emb = p_encoder(**p)  # .to("cpu").numpy()
                 p_embs += [p_emb]
 
-        #p_embs = torch.Tensor(p_embs).squeze()
-        p_emb = torch.cat(p_embs, dim=0)#.squeeze()
+        # p_embs = torch.Tensor(p_embs).squeze()
+        p_emb = torch.cat(p_embs, dim=0)  # .squeeze()
 
         # e.g. [Q, B_D], [P, B_D] because bertencoder output is [B, B_D]
-        dot_product = q_emb @ p_emb.transpose(0, 1) # [Q, P]
-        q_l2_distance = torch.sqrt(torch.sum(q_emb**2, dim=-1)).view(-1, 1) # [Q, 1]
-        p_l2_distance = torch.sqrt(torch.sum(p_emb**2, dim=-1)).view(-1, 1) # [P, 1]
-        cos_sim = dot_product / (q_l2_distance @ p_l2_distance.transpose(0, 1)) # [Q, P]
+        dot_product = q_emb @ p_emb.transpose(0, 1)  # [Q, P]
+        q_l2_distance = torch.sqrt(torch.sum(q_emb**2, dim=-1)).view(-1, 1)  # [Q, 1]
+        p_l2_distance = torch.sqrt(torch.sum(p_emb**2, dim=-1)).view(-1, 1)  # [P, 1]
+        cos_sim = dot_product / (
+            q_l2_distance @ p_l2_distance.transpose(0, 1)
+        )  # [Q, P]
         indices = torch.argsort(cos_sim, dim=-1, descending=True)
         cos_sim = torch.take_along_dim(cos_sim, indices, dim=-1)
 
@@ -320,7 +384,7 @@ class BiRetrieval:
         return cos_sim[:, :topk].tolist(), indices[:, :topk].tolist()
 
     def get_relevant_doc_dot_prod(self, query, topk=1):
-        
+
         device = self.args.device
         tokenizer = self.tokenizer
         padding = self.padding
@@ -334,18 +398,23 @@ class BiRetrieval:
         q_encoder.eval()
         p_encoder.eval()
         with torch.no_grad():
-            if isinstance(query, str):query = [query]
-            q_seqs_val = tokenizer(query, padding=padding, truncation=True, return_tensors="pt").to(device)
-            q_emb = q_encoder(**q_seqs_val)#.to("cpu")
+            if isinstance(query, str):
+                query = [query]
+            q_seqs_val = tokenizer(
+                query, padding=padding, truncation=True, return_tensors="pt"
+            ).to(device)
+            q_emb = q_encoder(**q_seqs_val)  # .to("cpu")
 
             p_embs = []
             for p in self.corpus:
-                p = tokenizer(p, padding=padding, truncation=True, return_tensors="pt").to(device)
-                p_emb = p_encoder(**p)#.to("cpu").numpy()
+                p = tokenizer(
+                    p, padding=padding, truncation=True, return_tensors="pt"
+                ).to(device)
+                p_emb = p_encoder(**p)  # .to("cpu").numpy()
                 p_embs += [p_emb]
 
-        #p_embs = torch.Tensor(p_embs).squeze()
-        p_embs = torch.cat(p_embs, dim=0)#.squeeze()
+        # p_embs = torch.Tensor(p_embs).squeze()
+        p_embs = torch.cat(p_embs, dim=0)  # .squeeze()
 
         scores = q_emb @ p_embs.transpose(0, 1)
         indices = torch.argsort(scores, dim=-1, descending=True)
@@ -354,8 +423,4 @@ class BiRetrieval:
         scores = scores.detach().cpu().numpy()
         indices = indices.detach().cpu().numpy()
 
-
         return scores[:, :topk].tolist(), indices[:, :topk].tolist()
-    
-
-    

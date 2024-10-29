@@ -8,6 +8,7 @@ import logging
 import sys
 import os
 import json
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Callable, Dict, List, NoReturn, Tuple
@@ -46,13 +47,18 @@ from utils_common import json_to_config, dict_to_json
 
 logger = logging.getLogger(__name__)
 
-def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_datasets=None):
-    
+
+def run_odqa(
+    args, inference_config, test_datasets, wiki_path, pred_dir, valid_datasets=None
+):
+
     # Load QA Model
     match args.qa:
         case "ext":
             print("******* Extractive QA Model 선택 *******")
-            QA_model = ExtractiveQA(args, inference_config.qa_config, test_datasets, valid_datasets)
+            QA_model = ExtractiveQA(
+                args, inference_config.qa_config, test_datasets, valid_datasets
+            )
         case "abs":
             pass
 
@@ -60,17 +66,21 @@ def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_d
     match args.retrieval:
         case "sparse":
             print("******* Sparse Retrieval Model 선택 *******")
-            Ret_model = Sparse_Model(args, inference_config, test_datasets, wiki_path, valid_datasets)
+            Ret_model = Sparse_Model(
+                args, inference_config, test_datasets, wiki_path, valid_datasets
+            )
         case "dense":
             print(("******* Dense (SBERT) Retrieval Model 선택 *******"))
-            Ret_model = Dense_Model(args, inference_config, test_datasets, wiki_path, valid_datasets)
+            Ret_model = Dense_Model(
+                args, inference_config, test_datasets, wiki_path, valid_datasets
+            )
             pass
         case "hybrid":
             pass
 
     if args.do_predict:
         # Inference
-        output_dir = os.path.join(pred_dir, "test") # predictions.json 출력폴더
+        output_dir = os.path.join(pred_dir, "test")  # predictions.json 출력폴더
 
         # 1. Retrieval Model에서 Question에 맞는 Context를 가져옴
         test_retrieve_datasets = Ret_model.get_contexts(test_datasets)
@@ -84,32 +94,60 @@ def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_d
             output_dir = os.path.join(pred_dir, "validation")
             valid_retrieve_datasets = Ret_model.get_contexts(valid_datasets)
             valid_predictions = QA_model.predict(valid_retrieve_datasets, output_dir)
-            dict_to_json(os.path.join(output_dir,"predictions.json"),
-                        os.path.join(output_dir,"prediction_with_ans.json"),
-                        answers)
+            dict_to_json(
+                os.path.join(output_dir, "predictions.json"),
+                os.path.join(output_dir, "prediction_with_ans.json"),
+                answers,
+            )
 
     elif args.do_eval:
-        output_dir = os.path.join(pred_dir, "eval") 
+        output_dir = os.path.join(pred_dir, "eval")
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
 
         valid_retrieve_datasets = Ret_model.get_contexts(valid_datasets)
         QA_model.predict(valid_retrieve_datasets, output_dir)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="Inference Options 설정", default="./config/base_config.json")
-    parser.add_argument("--pred_dir", help="Prediction 폴더 설정", default="./predictions")
-    parser.add_argument("--qa", required=True, help="qa 타입을 설정해주세요. ['abs','ext']")
-    parser.add_argument("--retrieval", required=True, help="retrieval 타입을 설정해주세요. ['sparse','hybrid','dense']")
-    parser.add_argument("--do_valid", action="store_true", help="Validation 데이터셋에 대해 Prediction을 저장하기 위한 옵션", default=False)
-    parser.add_argument("--do_predict", action="store_true", help="Test 데이터셋에 대해 Predictions을 저장하기 위한 옵션, do_eval과 겹치면 안됨", default=False)
-    parser.add_argument("--do_eval", action="store_true", help="Validation 데이터셋에 대해 Evaluate", default=False)
+    parser.add_argument(
+        "--config", help="Inference Options 설정", default="./config/base_config.json"
+    )
+    parser.add_argument(
+        "--pred_dir", help="Prediction 폴더 설정", default="./predictions"
+    )
+    parser.add_argument(
+        "--qa", required=True, help="qa 타입을 설정해주세요. ['abs','ext']"
+    )
+    parser.add_argument(
+        "--retrieval",
+        required=True,
+        help="retrieval 타입을 설정해주세요. ['sparse','hybrid','dense']",
+    )
+    parser.add_argument(
+        "--do_valid",
+        action="store_true",
+        help="Validation 데이터셋에 대해 Prediction을 저장하기 위한 옵션",
+        default=False,
+    )
+    parser.add_argument(
+        "--do_predict",
+        action="store_true",
+        help="Test 데이터셋에 대해 Predictions을 저장하기 위한 옵션, do_eval과 겹치면 안됨",
+        default=False,
+    )
+    parser.add_argument(
+        "--do_eval",
+        action="store_true",
+        help="Validation 데이터셋에 대해 Evaluate",
+        default=False,
+    )
     args = parser.parse_args()
-    
+
     print("=" * 8)
-    print("QA Model type :",args.qa)
-    print("Retrieval Model type :",args.retrieval)
+    print("QA Model type :", args.qa)
+    print("Retrieval Model type :", args.retrieval)
     print("Validation Predictions Options", args.do_valid)
     print("=" * 8)
 
@@ -121,29 +159,47 @@ if __name__ == "__main__":
     )
 
     inference_config = json_to_config(args.config)
-    wiki_path = os.path.join(inference_config.datasets,"wikipedia_documents.json")
-    
+    wiki_path = os.path.join(inference_config.datasets, "wikipedia_documents.json")
+
     # datasets load
-    
+
     datasets = load_from_disk(inference_config.datasets)
     test_datasets = datasets["test"]
-    
+
     if args.do_predict:
         if args.do_valid:
             print("Test Dataset Load --------")
             print(test_datasets)
             print("validation Dataset Load --------")
             valid_datasets = datasets["validation"]
-            answers = {data["id"]:data["answers"]["text"][0] for data in valid_datasets}
-            valid_datasets = valid_datasets.remove_columns(["title","context","answers","document_id"])
+            answers = {
+                data["id"]: data["answers"]["text"][0] for data in valid_datasets
+            }
+            valid_datasets = valid_datasets.remove_columns(
+                ["title", "context", "answers", "document_id"]
+            )
             print(valid_datasets)
-            run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir, valid_datasets=valid_datasets)
+            run_odqa(
+                args,
+                inference_config,
+                test_datasets,
+                wiki_path,
+                args.pred_dir,
+                valid_datasets=valid_datasets,
+            )
         else:
             test_datasets = datasets["test"]
             run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir)
-    
+
     elif args.do_eval:
-        valid_datasets = datasets["validation"].remove_columns(["title","document_id"])
-        run_odqa(args, inference_config, test_datasets, wiki_path, args.pred_dir, valid_datasets=valid_datasets)
+        valid_datasets = datasets["validation"].remove_columns(["title", "document_id"])
+        run_odqa(
+            args,
+            inference_config,
+            test_datasets,
+            wiki_path,
+            args.pred_dir,
+            valid_datasets=valid_datasets,
+        )
 
     print("******* predict dataset Predictions *******")

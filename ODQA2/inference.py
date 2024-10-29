@@ -22,6 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 # retrieval 점수 평가
 def evaluate(
     retrieved_df,
@@ -32,15 +33,17 @@ def evaluate(
         hit_at_k = hit(retrieved_df)
         return hit_at_k
 
-    elif eval_metric == "mrr": # 평균 역 순위 계산
+    elif eval_metric == "mrr":  # 평균 역 순위 계산
         mrr_at_k = mrr(retrieved_df)
         return mrr_at_k
+
 
 # 선호 아이템이 있는 히트 수를 계산
 def hit(df):
     hits = len(df[df["rank"] != 0])
     hit_at_k = hits / len(df)  # 총 데이터 수 대비 비율 계산
     return hit_at_k
+
 
 # 평균 역 순위(MRR) 계산
 def mrr(df):
@@ -51,24 +54,27 @@ def mrr(df):
     mrr_at_k = mrr_total / len(df)  # 평균 계산
     return mrr_at_k
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, default="./config/inference_config.json")
+    parser.add_argument(
+        "-c", "--config", type=str, default="./config/inference_config.json"
+    )
     args = parser.parse_args()
 
     ### config 파일들 불러오기
     # retriever, reader의 config 경로가 있는 base config
-    with open(args.config, 'r', encoding="utf-8") as f:
+    with open(args.config, "r", encoding="utf-8") as f:
         config = json.load(f)
         config = Box(config)
 
     # retriever config 불러오기
-    with open(config.retriever, 'r', encoding='utf-8') as f:
+    with open(config.retriever, "r", encoding="utf-8") as f:
         retriever_config = json.load(f)
         retriever_config = Box(retriever_config)
-    
+
     # reader config 불러오기
-    with open(config.reader, 'r', encoding='utf-8') as f:
+    with open(config.reader, "r", encoding="utf-8") as f:
         reader_config = json.load(f)
         reader_config = Box(reader_config)
 
@@ -81,48 +87,68 @@ if __name__ == "__main__":
     contexts = wiki_unique_df["text"].tolist()  # unique text 추출
     document_ids = wiki_unique_df["document_id"].tolist()
 
-    if retriever_config.embedding_method in ['tfidf', 'bm25']:
+    if retriever_config.embedding_method in ["tfidf", "bm25"]:
         if retriever_config.tokenizer_model_name == "mecab":
             tokenizer = Mecab().morphs
         else:
-            tokenizer = AutoTokenizer.from_pretrained(retriever_config.tokenizer_model_name, use_fast=True)
+            tokenizer = AutoTokenizer.from_pretrained(
+                retriever_config.tokenizer_model_name, use_fast=True
+            )
             tokenizer = tokenizer.tokenize
-    retriever = SparseRetrieval(embedding_method=retriever_config.embedding_method,
-                                tokenizer=tokenizer,
-                                contexts=contexts,
-                                document_ids=document_ids)
+    retriever = SparseRetrieval(
+        embedding_method=retriever_config.embedding_method,
+        tokenizer=tokenizer,
+        contexts=contexts,
+        document_ids=document_ids,
+    )
 
     if retriever_config.embedding_method == "tfidf":
         retriever.get_sparse_embedding_tfidf()
     elif retriever_config.embedding_method == "bm25":
         retriever.get_sparse_embedding_bm25()
 
-    test_dataset = load_from_disk(retriever_config.eval_data_path)['test']
+    test_dataset = load_from_disk(retriever_config.eval_data_path)["test"]
     logger.info("Evaluation dataset loaded with %d examples.", len(test_dataset))
 
-    result_df = retriever.retrieve(test_dataset, topk=retriever_config.topk, save=False, retrieval_save_path=config.save_path)
+    result_df = retriever.retrieve(
+        test_dataset,
+        topk=retriever_config.topk,
+        save=False,
+        retrieval_save_path=config.save_path,
+    )
 
     ### MRC
-    
+
     # wikipedia_documents의 document_id 키 이용해 context 매치
     if config.reader_type == "extractive":
-        with open(os.path.join(reader_config.data_args.dataset_name, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
+        with open(
+            os.path.join(
+                reader_config.data_args.dataset_name, "wikipedia_documents.json"
+            ),
+            "r",
+            encoding="utf-8",
+        ) as f:
             reader_corpus = json.load(f)
     elif config.reader_type == "llama":
-        with open(os.path.join(reader_config.data_path, 'wikipedia_documents.json'), 'r', encoding='utf-8') as f:
+        with open(
+            os.path.join(reader_config.data_path, "wikipedia_documents.json"),
+            "r",
+            encoding="utf-8",
+        ) as f:
             reader_corpus = json.load(f)
-    
-    result_df['context'] = None
-    for idx, doc_ids in enumerate(result_df['document_id']):
-        result_df.loc[idx, 'context'] = ' '.join([reader_corpus[str(i)]['text'] for i in doc_ids])
+
+    result_df["context"] = None
+    for idx, doc_ids in enumerate(result_df["document_id"]):
+        result_df.loc[idx, "context"] = " ".join(
+            [reader_corpus[str(i)]["text"] for i in doc_ids]
+        )
 
     retrieved_test = Dataset.from_pandas(result_df)
-    
 
     if config.reader_type == "extractive":
         reader = ExtractiveQA(config.reader)
         reader.predict(retrieved_test, config.save_path)
-        
+
     elif config.reader_type == "llama":
         reader = LlamaQA(config.reader)
         reader.load_model()

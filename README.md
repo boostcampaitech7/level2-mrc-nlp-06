@@ -1,6 +1,6 @@
 # Open-Domain Question Answering 프로젝트
 > 주어진 Open-Domain 질문에 대해 정확한 답변을 생성하는 모델을 개발하는 프로젝트입니다.
-> 
+>
 > 네이버 커넥트재단 부스트캠프 AI Tech 7기 NLP 과정의 일환으로 3주간 진행했습니다. _(진행기간: 2024.10.02 ~ 2024.10.24)_
 
 ## 1. 프로젝트 개요
@@ -37,11 +37,11 @@
 	- [데이터 분석](./EDA_team_folder/) 및 [전처리](./data_preprocessing/): 개행(`\n`), 마크다운 문법, 외국어 전처리 및 실험
 	- [데이터 증강](./data_augmentation/): AEDA, OpenAI GPT-4o 프롬프트 튜닝
 - **Retrieval model**
-	- [Sparse](./retrieval/sparse/README.md): TF-IDF, BM25, BGE-M3, SPLADE
-	- [Dense](./retrieval/dense/README.md): Bi-Encoder, Cross-Encoder, 2-stage retrieval
-	- [Hybrid](./retrieval/hybrid/readme.md): re-rank, hybrid approach
+	- [Sparse](./retrieval/sparse/): TF-IDF, BM25, BGE-M3, SPLADE
+	- [Dense](./retrieval/dense/): Bi-Encoder, Cross-Encoder, 2-stage retrieval
+	- [Hybrid](./retrieval/hybrid/): re-rank, hybrid approach
 - **Reader Model**
-	- [Extractive](./reader/extractive/README.md): BERT, RoBERTa, KoELECTRA fine-tuning
+	- [Extractive](./reader/extractive/): BERT, RoBERTa, KoELECTRA fine-tuning
 	- [Abstractive](./reader/abstractive/): GPT-4o Prompt Tuning, Llama-3.1-8B Q-LoRA Instruction Tuning
 - **Ensemble**: Hard voting
 
@@ -49,7 +49,7 @@
 ## 5. 개발 환경
 - **Hardware**: Tesla V100 GPU (4 servers)
 - **Software**: Linux, Git, Python (3.10.15 버전)
-- **협업 도구**: 
+- **협업 도구**:
     - Github: 진행 상황 추적 및 코드 버전 관리
     - Confluence: 프로젝트 단위 작업 결과 기록
 
@@ -96,8 +96,8 @@ bash inference.sh --qa ext --retrieval sparse --do_predict
 ## 7. 코드 구조
 ```text
 level2-mrc-nlp-06
-├── Data
-│   ├── EDA		   # EDA 수행 노트북 파일
+├── data
+│   ├── EDA		           # EDA 수행 노트북 파일
 │   ├── preprocessing      # 데이터 전처리
 │   └── augmentation       # 데이터 증강
 ├── retrieval              # Retrieve 모델 관련 코드

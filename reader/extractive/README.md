@@ -33,7 +33,7 @@ extractive
 
 ### Config  설정
 
-[config](https://github.com/boostcampaitech7/level2-mrc-nlp-06/blob/develop/reader/extractive/config/base_config.json)는 총 3가지로 config가 이루어져있다. 
+[config](https://github.com/boostcampaitech7/level2-mrc-nlp-06/blob/develop/reader/extractive/config/base_config.json)는 총 3가지로 config가 이루어져있다.
 
 1. `model_args` : 모델이 저장된 폴더 or huggingface 에 등록된 모델명을 불러오는 args
 2. `data_args` : Train, Valid, Test 데이터셋이 있는 path와 preprocessing할 때 필요한 값들을 불러오는 args
@@ -56,7 +56,7 @@ extractive
     ```shell
     level2-mrc-nlp-06$ bash train_mrc.sh --type=ext --do_eval
     ```
-    
+
     * `--do_eval` : 평가 metrics를 출력할지에 대한 여부 설정
 
 ### 결과 저장

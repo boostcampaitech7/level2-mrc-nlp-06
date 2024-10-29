@@ -24,7 +24,6 @@ from pymilvus.model.hybrid import BGEM3EmbeddingFunction
 from pymilvus.model.sparse import SpladeEmbeddingFunction
 
 
-
 # 2단계 상위 경로를 시스템 경로에 추가
 # print(os.path.join(os.getcwd(),"retrieval","sparse"))
 # sys.path.append(os.path.join(os.getcwd(),"retrieval","sparse"))
@@ -55,12 +54,15 @@ def timer(name):
         elapsed = time.time() - t0  # 경과 시간 계산
         print(f"[{name}] done in {elapsed:.3f} s")  # 경과 시간 출력
 
-# TF-IDF, BM25 알고리즘으로 문서 검색
-class SparseRetrieval: 
 
-    def __init__(self, embedding_method: str, tokenizer, contexts, document_ids) -> NoReturn:
+# TF-IDF, BM25 알고리즘으로 문서 검색
+class SparseRetrieval:
+
+    def __init__(
+        self, embedding_method: str, tokenizer, contexts, document_ids
+    ) -> NoReturn:
         """
-        문서 검색을 위한 Sparse Retrieval 클래스. 
+        문서 검색을 위한 Sparse Retrieval 클래스.
         TF-IDF 및 BM25 알고리즘을 사용하여 문서 임베딩과 검색을 수행한다.
 
         Args:
@@ -99,17 +101,19 @@ class SparseRetrieval:
         else:
             logger.info("Build TF-IDF passage embedding")
             self.tfidfv = TfidfVectorizer(
-                tokenizer=self.tokenizer, ngram_range=(1, 3), max_features=None,
-                sublinear_tf=True
+                tokenizer=self.tokenizer,
+                ngram_range=(1, 3),
+                max_features=None,
+                sublinear_tf=True,
             )
             self.p_embedding = self.tfidfv.fit_transform(
                 tqdm(self.contexts, desc="TF-IDF Vectorization")
             )
             logger.info("Saving TF-IDF pickle files.")
-            
+
             # 'model' 폴더 없으면 생성
-            if not os.path.isdir(os.path.join(sparse_path_name,"model")):
-                os.mkdir(os.path.join(sparse_path_name,"model"))
+            if not os.path.isdir(os.path.join(sparse_path_name, "model")):
+                os.mkdir(os.path.join(sparse_path_name, "model"))
 
             # vectorizer 및 context 임베딩 결과 저장 (.bin 파일)
             with open(vectorizer_path, "wb") as file:
@@ -117,7 +121,6 @@ class SparseRetrieval:
             with open(emb_path, "wb") as file:
                 pickle.dump(self.p_embedding, file)
             logger.info("Embedding pickle saved.")
-
 
     def get_sparse_embedding_bm25(self) -> NoReturn:
         """
@@ -137,13 +140,17 @@ class SparseRetrieval:
                 self.bm25 = pickle.load(file)
         else:
             logger.info("Fitting BM25 model.")
-            self.bm25 = BM25Okapi(tqdm(self.contexts, desc="Tokenizing for BM25"), tokenizer = self.tokenizer, k1=1.0)
+            self.bm25 = BM25Okapi(
+                tqdm(self.contexts, desc="Tokenizing for BM25"),
+                tokenizer=self.tokenizer,
+                k1=1.0,
+            )
 
             logger.info("Saving BM25 pickle file.")
 
             # 'model' 폴더 없으면 생성
-            if not os.path.isdir(os.path.join(sparse_path_name,"model")):
-                os.mkdir(os.path.join(sparse_path_name,"model"))
+            if not os.path.isdir(os.path.join(sparse_path_name, "model")):
+                os.mkdir(os.path.join(sparse_path_name, "model"))
 
             # BM25 모델 저장
             with open(vectorizer_path, "wb") as file:
@@ -151,7 +158,11 @@ class SparseRetrieval:
             logger.info("BM25 model saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 10, save: Optional[bool] = True, retrieval_save_path: Optional[str] = "../outputs/"
+        self,
+        query_or_dataset: Union[str, Dataset],
+        topk: Optional[int] = 10,
+        save: Optional[bool] = True,
+        retrieval_save_path: Optional[str] = "../outputs/",
     ) -> Union[Tuple[List, List], pd.DataFrame]:
         """
         주어진 쿼리 또는 데이터셋에 대해 문서 검색을 수행한다.
@@ -182,10 +193,14 @@ class SparseRetrieval:
         if isinstance(query_or_dataset, str):
             logger.info("Retrieving for single query.")
             if self.embedding_method == "tfidf":
-                doc_scores, doc_indices = self.get_relevant_doc_tfidf(query_or_dataset, k=topk)
+                doc_scores, doc_indices = self.get_relevant_doc_tfidf(
+                    query_or_dataset, k=topk
+                )
             elif self.embedding_method == "bm25":
-                doc_scores, doc_indices = self.get_relevant_doc_bm25(query_or_dataset, k=topk)
-            
+                doc_scores, doc_indices = self.get_relevant_doc_bm25(
+                    query_or_dataset, k=topk
+                )
+
             logger.info(f"[Search query]\n{query_or_dataset}\n")
             for i in range(topk):
                 logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
@@ -202,23 +217,33 @@ class SparseRetrieval:
             # 유사한 문서 점수(doc_scores), 문서 인덱스(doc_indices) 추출
             with timer("query exhaustive search"):
                 if self.embedding_method == "tfidf":
-                    doc_scores, doc_indices = self.get_relevant_doc_bulk_tfidf(queries, k=topk)
+                    doc_scores, doc_indices = self.get_relevant_doc_bulk_tfidf(
+                        queries, k=topk
+                    )
                 elif self.embedding_method == "bm25":
-                    doc_scores, doc_indices = self.get_relevant_doc_bulk_bm25(queries, k=topk)
+                    doc_scores, doc_indices = self.get_relevant_doc_bulk_bm25(
+                        queries, k=topk
+                    )
 
             # 각 쿼리별 검색 결과 딕셔너리로 저장
-            for idx, example in enumerate(tqdm(query_or_dataset, desc="Sparse retrieval: ")):
+            for idx, example in enumerate(
+                tqdm(query_or_dataset, desc="Sparse retrieval: ")
+            ):
                 # 쿼리와 유사한 wiki 문서 리스트
                 retrieved_contexts = [self.contexts[pid] for pid in doc_indices[idx]]
-                retrieved_document_ids = [self.document_ids[pid] for pid in doc_indices[idx]]
+                retrieved_document_ids = [
+                    self.document_ids[pid] for pid in doc_indices[idx]
+                ]
 
                 # retrieval 결과 딕셔너리
                 retrieved_dict = {
-                    "question": example["question"],         # 쿼리
+                    "question": example["question"],  # 쿼리
                     "id": example["id"],
                     "document_id": retrieved_document_ids,
                     # id
-                    "context": " ".join(retrieved_contexts), # 검색된 context 이어 붙이기
+                    "context": " ".join(
+                        retrieved_contexts
+                    ),  # 검색된 context 이어 붙이기
                 }
 
                 # 정답이 있는 데이터의 경우 원본 context 및 정답 저장 (성능 평가 위함)
@@ -227,9 +252,11 @@ class SparseRetrieval:
                     retrieved_dict["answers"] = example["answers"]
                     # 정답 문서가 몇 번째로 retrieval되었는지 rank 저장 (retrieved 결과에 정답 문서 없으면 0)
                     try:
-                        retrieved_dict["rank"] = (retrieved_contexts.index(example["context"]) + 1)
+                        retrieved_dict["rank"] = (
+                            retrieved_contexts.index(example["context"]) + 1
+                        )
                     except ValueError:
-                        retrieved_dict["rank"] = 0 
+                        retrieved_dict["rank"] = 0
                 retrieved_data.append(retrieved_dict)
 
             # Pandas DataFrame으로 결과 변환
@@ -237,15 +264,18 @@ class SparseRetrieval:
 
             # save=True 이면 지정된 경로에 결과 데이터프레임 csv 파일로 저장
             if save:
-                retrieved_file_name = retrieval_save_path + self.embedding_method + '.csv'
+                retrieved_file_name = (
+                    retrieval_save_path + self.embedding_method + ".csv"
+                )
                 retrieved_df.to_csv(retrieved_file_name, index=False)
 
             logger.info("Completed retrieval for dataset queries.")
 
             return retrieved_df
 
-
-    def get_relevant_doc_tfidf(self, query: str, k: Optional[int] = 10) -> Tuple[List, List]:
+    def get_relevant_doc_tfidf(
+        self, query: str, k: Optional[int] = 10
+    ) -> Tuple[List, List]:
         """
         주어진 단일 쿼리에 대해 TF-IDF 방식으로 관련 문서를 검색한다.
 
@@ -280,8 +310,9 @@ class SparseRetrieval:
         doc_indices = sorted_result.tolist()[:k]
         return doc_score, doc_indices
 
-
-    def get_relevant_doc_bulk_tfidf(self, queries: List, k: Optional[int] = 10) -> Tuple[List, List]:
+    def get_relevant_doc_bulk_tfidf(
+        self, queries: List, k: Optional[int] = 10
+    ) -> Tuple[List, List]:
         """
         여러 쿼리에 대해 TF-IDF 방식으로 관련 문서를 대량 검색한다.
 
@@ -319,8 +350,9 @@ class SparseRetrieval:
             doc_indices.append(sorted_result.tolist()[:k])
         return doc_scores, doc_indices
 
-
-    def get_relevant_doc_bm25(self, query: str, k: Optional[int] = 10) -> Tuple[List, List]:
+    def get_relevant_doc_bm25(
+        self, query: str, k: Optional[int] = 10
+    ) -> Tuple[List, List]:
         """
         주어진 쿼리에 대해 BM25 방식으로 관련 문서를 검색한다.
 
@@ -332,7 +364,7 @@ class SparseRetrieval:
             Tuple[List, List]: 문서의 점수와 인덱스를 튜플로 반환한다.
         """
 
-        tokenized_query = self.tokenizer(query)             # 쿼리를 토큰화
+        tokenized_query = self.tokenizer(query)  # 쿼리를 토큰화
         doc_scores = self.bm25.get_scores(tokenized_query)  # BM25 점수 계산
 
         # 상위 k개의 문서 선택
@@ -341,7 +373,9 @@ class SparseRetrieval:
         doc_indices = sorted_result.tolist()[:k]
         return doc_score, doc_indices
 
-    def get_relevant_doc_bulk_bm25(self, queries: List, k: Optional[int] = 10) -> Tuple[List, List]:
+    def get_relevant_doc_bulk_bm25(
+        self, queries: List, k: Optional[int] = 10
+    ) -> Tuple[List, List]:
         """
         여러 쿼리에 대해 BM25 방식으로 관련 문서를 대량 검색한다.
 
@@ -353,7 +387,9 @@ class SparseRetrieval:
             Tuple[List, List]: 각 쿼리에 대한 문서의 점수와 인덱스를 리스트 형태로 반환한다.
         """
 
-        tokenized_queries = [self.tokenizer(query) for query in queries]  # 각 쿼리를 토큰화
+        tokenized_queries = [
+            self.tokenizer(query) for query in queries
+        ]  # 각 쿼리를 토큰화
         all_query_terms = set(term for query in tokenized_queries for term in query)
 
         # 모든 문서에 대해 쿼리 term의 Frequency Matrix 생성
@@ -373,7 +409,9 @@ class SparseRetrieval:
         # 각 쿼리에 대해 BM25 점수 계산
         for tokenized_query in tqdm(tokenized_queries, desc="Calculating BM25 scores"):
             # 쿼리에서 등장한 단어들에 대한 인덱스를 선택
-            query_term_indices = [list(all_query_terms).index(term) for term in tokenized_query]
+            query_term_indices = [
+                list(all_query_terms).index(term) for term in tokenized_query
+            ]
 
             # 해당 단어들의 문서 내 빈도 추출
             query_term_freqs = term_freq_matrix[query_term_indices, :]
@@ -403,11 +441,19 @@ class SparseRetrieval:
         return doc_scores, doc_indices
 
 
-
 class LearnedSparseRetrieval:
-    def __init__(self, embedding_method, embedding_model_name, contexts, ids, collection_name, bgem3_type="sparse", dense_metric_type="IP") -> NoReturn:
+    def __init__(
+        self,
+        embedding_method,
+        embedding_model_name,
+        contexts,
+        ids,
+        collection_name,
+        bgem3_type="sparse",
+        dense_metric_type="IP",
+    ) -> NoReturn:
         """
-        문서 검색을 위한 Learned Sparse Retrieval 클래스. 
+        문서 검색을 위한 Learned Sparse Retrieval 클래스.
         SPLADE 및 BGE-M3 알고리즘을 사용하여 문서 임베딩과 검색을 수행한다.
 
         Args:
@@ -422,11 +468,11 @@ class LearnedSparseRetrieval:
         self.embedding_method = embedding_method
         self.embedding_model_name = embedding_model_name
         self.contexts = contexts
-        self.ids = ids 
+        self.ids = ids
         self.collection_name = collection_name
         self.bgem3_type = bgem3_type
         self.dense_metric_type = dense_metric_type
-        self.ef = None   # 임베딩 함수 초기화
+        self.ef = None  # 임베딩 함수 초기화
         self.col = None  # 컬렉션 초기화
 
     def get_sparse_embedding_splade(self) -> NoReturn:
@@ -440,8 +486,7 @@ class LearnedSparseRetrieval:
 
         # 모델 지정
         self.ef = SpladeEmbeddingFunction(
-            model_name=self.embedding_model_name, 
-            device="cuda:0"  # GPU 사용
+            model_name=self.embedding_model_name, device="cuda:0"  # GPU 사용
         )
 
         # 컬렉션 조회: 존재하지 않으면 생성
@@ -451,7 +496,7 @@ class LearnedSparseRetrieval:
             index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
             self.col.create_index("sparse_vector", index)  # 인덱스 생성
             self.col.load()  # 컬렉션 로드
-            logger.info(f"Collection \"{self.collection_name}\" is loaded.")
+            logger.info(f'Collection "{self.collection_name}" is loaded.')
             logger.info(f"Number of entities contained: {self.col.num_entities}")
         else:
             # 데이터 스키마 지정
@@ -460,13 +505,17 @@ class LearnedSparseRetrieval:
                 FieldSchema(name="context", dtype=DataType.VARCHAR, max_length=65535),
                 FieldSchema(name="sparse_vector", dtype=DataType.SPARSE_FLOAT_VECTOR),
             ]
-            schema = CollectionSchema(fields, description="Collection for SPLADE embeddings")
-            self.col = Collection(col_name, schema, consistency_level="Strong")  # 컬렉션 생성
+            schema = CollectionSchema(
+                fields, description="Collection for SPLADE embeddings"
+            )
+            self.col = Collection(
+                col_name, schema, consistency_level="Strong"
+            )  # 컬렉션 생성
             index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
             self.col.create_index("sparse_vector", index)  # 인덱스 생성
             self.col.load()  # 컬렉션 로드
 
-            # 임베딩 생성 
+            # 임베딩 생성
             batch_size = 4  # 배치 크기 설정
             for i in tqdm(range(0, len(self.contexts), batch_size)):
                 end_idx = min(i + batch_size, len(self.contexts))  # 마지막 배치 처리
@@ -476,7 +525,9 @@ class LearnedSparseRetrieval:
 
                 torch.cuda.empty_cache()
                 with torch.no_grad():
-                    batch_docs_embeddings = self.ef.encode_documents(batch_contexts)  # 문서 임베딩 생성
+                    batch_docs_embeddings = self.ef.encode_documents(
+                        batch_contexts
+                    )  # 문서 임베딩 생성
                     batch_entities = []
                     for j in range(len(batch_ids)):
                         entity = {
@@ -500,13 +551,13 @@ class LearnedSparseRetrieval:
 
         # 모델 지정
         self.ef = BGEM3EmbeddingFunction(
-            model_name=self.embedding_model_name, # 모델 이름 지정
-            device="cuda:0",    # GPU 사용
+            model_name=self.embedding_model_name,  # 모델 이름 지정
+            device="cuda:0",  # GPU 사용
             use_fp16=True,
-            return_sparse=True, # Sparse Embedding 결과 얻기
-            return_dense=True   # Dense Embedding 결과 얻기
+            return_sparse=True,  # Sparse Embedding 결과 얻기
+            return_dense=True,  # Dense Embedding 결과 얻기
         )
-        dense_dim = self.ef.dim['dense']  # Dense Embedding 차원
+        dense_dim = self.ef.dim["dense"]  # Dense Embedding 차원
 
         # 컬렉션 조회: 존재하지 않으면 생성
         col_name = self.collection_name
@@ -514,28 +565,32 @@ class LearnedSparseRetrieval:
             self.col = Collection(col_name)
             index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
             self.col.create_index("sparse_vector", index)  # sparse 벡터 인덱스 생성
-            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type} 
-            self.col.create_index("dense_vector", index)   # dense 벡터 인덱스 생성
+            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type}
+            self.col.create_index("dense_vector", index)  # dense 벡터 인덱스 생성
             self.col.load()  # 컬렉션 로드
-            logger.info(f"Collection \"{self.collection_name}\" is loaded.")
+            logger.info(f'Collection "{self.collection_name}" is loaded.')
             logger.info(f"Number of entities contained: {self.col.num_entities}")
         else:
             # 데이터 스키마 지정
             fields = [
-                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True), 
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
                 FieldSchema(name="context", dtype=DataType.VARCHAR, max_length=65535),
                 FieldSchema(name="sparse_vector", dtype=DataType.SPARSE_FLOAT_VECTOR),
-                FieldSchema(name="dense_vector", dtype=DataType.FLOAT16_VECTOR, dim=dense_dim)
+                FieldSchema(
+                    name="dense_vector", dtype=DataType.FLOAT16_VECTOR, dim=dense_dim
+                ),
             ]
-            schema = CollectionSchema(fields, description="Collection for BGE M3 embeddings")
+            schema = CollectionSchema(
+                fields, description="Collection for BGE M3 embeddings"
+            )
             self.col = Collection(col_name, schema, consistency_level="Strong")
             index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP"}
             self.col.create_index("sparse_vector", index)  # sparse 벡터 인덱스 생성
-            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type} 
-            self.col.create_index("dense_vector", index)   # dense 벡터 인덱스 생성
+            index = {"index_type": "FLAT", "metric_type": self.dense_metric_type}
+            self.col.create_index("dense_vector", index)  # dense 벡터 인덱스 생성
             self.col.load()  # 컬렉션 로드
 
-            # 임베딩 생성 
+            # 임베딩 생성
             batch_size = 4  # 배치 크기 설정
             for i in tqdm(range(0, len(self.contexts), batch_size)):
                 end_idx = min(i + batch_size, len(self.contexts))  # 마지막 배치 처리
@@ -545,17 +600,25 @@ class LearnedSparseRetrieval:
 
                 torch.cuda.empty_cache()
                 with torch.no_grad():
-                    batch_docs_embeddings = self.ef.encode_documents(batch_contexts)  # 문서 임베딩 생성
-                    batch_sparse_embeddings = batch_docs_embeddings['sparse']  # sparse embedding
-                    batch_dense_embeddings = batch_docs_embeddings['dense']    # dense embedding
+                    batch_docs_embeddings = self.ef.encode_documents(
+                        batch_contexts
+                    )  # 문서 임베딩 생성
+                    batch_sparse_embeddings = batch_docs_embeddings[
+                        "sparse"
+                    ]  # sparse embedding
+                    batch_dense_embeddings = batch_docs_embeddings[
+                        "dense"
+                    ]  # dense embedding
 
                     batch_entities = []
                     for j in range(len(batch_ids)):
                         entity = {
                             "id": batch_ids[j],
                             "context": batch_contexts[j],
-                            "sparse_vector": batch_sparse_embeddings[[j], :],  # sparse vector
-                            "dense_vector": batch_dense_embeddings[j]          # dense vector
+                            "sparse_vector": batch_sparse_embeddings[
+                                [j], :
+                            ],  # sparse vector
+                            "dense_vector": batch_dense_embeddings[j],  # dense vector
                         }
                         batch_entities.append(entity)
 
@@ -563,7 +626,12 @@ class LearnedSparseRetrieval:
             logger.info(f"Number of entities inserted:{self.col.num_entities}")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], dense_metric_type = "IP", topk = 10, save: Optional[bool] = True, retrieval_save_path: Optional[str] = "../outputs/"
+        self,
+        query_or_dataset: Union[str, Dataset],
+        dense_metric_type="IP",
+        topk=10,
+        save: Optional[bool] = True,
+        retrieval_save_path: Optional[str] = "../outputs/",
     ) -> Union[Tuple[List, List], pd.DataFrame]:
         """
         주어진 쿼리 또는 데이터셋에 대해 문서 검색을 수행한다.
@@ -579,19 +647,25 @@ class LearnedSparseRetrieval:
             Union[Tuple[List, List], pd.DataFrame]: 검색된 문서와 점수 또는 데이터셋에 대한 검색 결과 데이터프레임.
         """
         # 임베딩 함수 및 컬렉션이 지정되었는지 확인
-        assert self.ef is not None and self.col is not None, "get_sparse_embedding() 메소드를 먼저 수행해주세요."
+        assert (
+            self.ef is not None and self.col is not None
+        ), "get_sparse_embedding() 메소드를 먼저 수행해주세요."
 
         # 단일 쿼리에 대한 검색
         if isinstance(query_or_dataset, str):
-            query = [query_or_dataset]                       # 쿼리 리스트로 반환
-            query_embeddings = self.ef.encode_queries(query) # 쿼리 임베딩 생성
-            if self.embedding_method=="splade":
-                search_result = self.sparse_search(query_embeddings, topk)  # SPLADE 모델에 대해서는 sparse retrieval
+            query = [query_or_dataset]  # 쿼리 리스트로 반환
+            query_embeddings = self.ef.encode_queries(query)  # 쿼리 임베딩 생성
+            if self.embedding_method == "splade":
+                search_result = self.sparse_search(
+                    query_embeddings, topk
+                )  # SPLADE 모델에 대해서는 sparse retrieval
                 doc_scores = []
                 doc_contexts = []
                 for i in range(len(search_result)):
                     doc_scores.append(search_result[i].score)  # 문서 유사도 점수 저장
-                    doc_contexts.append(search_result[i].get('context'))  # 문서 context로 저장
+                    doc_contexts.append(
+                        search_result[i].get("context")
+                    )  # 문서 context로 저장
 
                 logger.info(f"[Search query]\n{query_or_dataset}\n")
                 for i in range(topk):
@@ -599,51 +673,59 @@ class LearnedSparseRetrieval:
                     logger.debug(f"Passage: {doc_contexts[i]}")
 
                 return (doc_scores, doc_contexts)
-            
-            elif self.embedding_method=="bge-m3":
+
+            elif self.embedding_method == "bge-m3":
                 if self.bgem3_type == "sparse":
                     # BGE-M3의 sparse retrieval
-                    search_result = self.sparse_search(query_embeddings['sparse'], topk)
-                    
+                    search_result = self.sparse_search(query_embeddings["sparse"], topk)
+
                     doc_scores = []
                     doc_contexts = []
                     for i in range(len(search_result)):
                         doc_scores.append(search_result[i].score)
-                        doc_contexts.append(search_result[i].get('context'))
-                    
+                        doc_contexts.append(search_result[i].get("context"))
+
                     logger.info(f"[Sparse - Search query]\n{query_or_dataset}\n")
                     for i in range(topk):
                         logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
                         logger.debug(f"Passage: {doc_contexts[i]}")
                     return (doc_scores, doc_contexts)
-                
+
                 elif self.bgem3_type == "dense":
                     # BGE-M3의 dense retrieval
-                    search_result = self.dense_search(query_embeddings['dense'], dense_metric_type, topk)
-                    
+                    search_result = self.dense_search(
+                        query_embeddings["dense"], dense_metric_type, topk
+                    )
+
                     doc_scores = []
                     doc_contexts = []
                     for i in range(len(search_result)):
                         doc_scores.append(search_result[i].score)
-                        doc_contexts.append(search_result[i].get('context'))
-                    
+                        doc_contexts.append(search_result[i].get("context"))
+
                     logger.info(f"[Dense - Search query]\n{query_or_dataset}\n")
                     for i in range(topk):
                         logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
                         logger.debug(f"Passage: {doc_contexts[i]}")
                     return (doc_scores, doc_contexts)
 
-
                 elif self.bgem3_type == "hybrid":
                     # BGE-M3의 hybrid retrieval
-                    search_result = self.hybrid_search(query_embeddings['dense'], query_embeddings['sparse'], dense_metric_type, sparse_weight=1.0, dense_weight=1.0, topk=topk)
-                    
+                    search_result = self.hybrid_search(
+                        query_embeddings["dense"],
+                        query_embeddings["sparse"],
+                        dense_metric_type,
+                        sparse_weight=1.0,
+                        dense_weight=1.0,
+                        topk=topk,
+                    )
+
                     doc_scores = []
                     doc_contexts = []
                     for i in range(len(search_result)):
                         doc_scores.append(search_result[i].score)
-                        doc_contexts.append(search_result[i].get('context'))
-                    
+                        doc_contexts.append(search_result[i].get("context"))
+
                     logger.info(f"[Hybrid - Search query]\n{query_or_dataset}\n")
                     for i in range(topk):
                         logger.info(f"Top-{i+1} passage with score {doc_scores[i]:.4f}")
@@ -654,20 +736,32 @@ class LearnedSparseRetrieval:
         elif isinstance(query_or_dataset, Dataset):
             logger.info("Retrieving for dataset queries.")
             queries = query_or_dataset["question"]  # 쿼리 리스트 추출
-            query_embeddings = self.ef.encode_queries(queries)  # 모든 쿼리의 임베딩 생성
+            query_embeddings = self.ef.encode_queries(
+                queries
+            )  # 모든 쿼리의 임베딩 생성
             if self.embedding_method == "splade":
-                search_result = self.sparse_search(query_embeddings, topk)  # SPLADE sparse retrieval
+                search_result = self.sparse_search(
+                    query_embeddings, topk
+                )  # SPLADE sparse retrieval
             elif self.embedding_method == "bge-m3":
                 if self.bgem3_type == "sparse":
-                    search_result = self.sparse_search(query_embeddings['sparse'], topk)  # BGE-M3 sparse retrieval
+                    search_result = self.sparse_search(
+                        query_embeddings["sparse"], topk
+                    )  # BGE-M3 sparse retrieval
                 elif self.bgem3_type == "dense":
-                    search_result = self.dense_search(query_embeddings['dense'], dense_metric_type, topk) # BGE-M3 dense retrieval
+                    search_result = self.dense_search(
+                        query_embeddings["dense"], dense_metric_type, topk
+                    )  # BGE-M3 dense retrieval
                 elif self.bgem3_type == "hybrid":
                     search_result = self.hybrid_search(  # BGE-M3 hybrid retrieval
-                        query_embeddings['dense'], query_embeddings['sparse'], dense_metric_type, 
-                        sparse_weight=1.0, dense_weight=1.0, topk=topk
+                        query_embeddings["dense"],
+                        query_embeddings["sparse"],
+                        dense_metric_type,
+                        sparse_weight=1.0,
+                        dense_weight=1.0,
+                        topk=topk,
                     )
-            
+
             retrieved_data = []
 
             # 각 쿼리별 검색 결과 딕셔너리로 저장
@@ -677,9 +771,11 @@ class LearnedSparseRetrieval:
 
                 # retrieval 결과 딕셔너리
                 retrieved_dict = {
-                    "question": example['question'],         # 쿼리
-                    "id": example['id'],                     # id
-                    "context": " ".join(retrieved_contexts)  # 검색된 context 이어 붙이기
+                    "question": example["question"],  # 쿼리
+                    "id": example["id"],  # id
+                    "context": " ".join(
+                        retrieved_contexts
+                    ),  # 검색된 context 이어 붙이기
                 }
 
                 # 정답이 있는 데이터의 경우 원본 context 및 정답 저장 (성능 평가 위함)
@@ -701,13 +797,14 @@ class LearnedSparseRetrieval:
 
             # save=True 이면 지정된 경로에 결과 데이터프레임 csv 파일로 저장
             if save:
-                retrieved_file_name = retrieval_save_path + self.embedding_method + '_retrieved_df.csv'
+                retrieved_file_name = (
+                    retrieval_save_path + self.embedding_method + "_retrieved_df.csv"
+                )
                 retrieved_df.to_csv(retrieved_file_name, index=False)
 
             logger.info("Completed retrieval for dataset queries.")
 
             return retrieved_df
-        
 
     def dense_search(self, query_dense_embedding, dense_metric_type="IP", topk=10):
         """
@@ -730,7 +827,7 @@ class LearnedSparseRetrieval:
             param=search_params,
         )
         return res
-    
+
     def sparse_search(self, query_sparse_embedding, topk=10):
         """
         Sparse Embedding을 사용해 검색한다.
@@ -742,7 +839,7 @@ class LearnedSparseRetrieval:
         Returns:
             res: 검색 결과
         """
-        search_params = {"metric_type": "IP","params": {}}
+        search_params = {"metric_type": "IP", "params": {}}
         res = self.col.search(
             query_sparse_embedding,
             anns_field="sparse_vector",
@@ -751,13 +848,15 @@ class LearnedSparseRetrieval:
             param=search_params,
         )
         return res
-    
+
     def hybrid_search(
-            self,
-            query_dense_embedding, query_sparse_embedding,
-            dense_metric_type='IP',
-            sparse_weight=1.0, dense_weight=1.0,
-            topk=10,
+        self,
+        query_dense_embedding,
+        query_sparse_embedding,
+        dense_metric_type="IP",
+        sparse_weight=1.0,
+        dense_weight=1.0,
+        topk=10,
     ):
         """
         Hybrid Embedding을 사용해 검색한다.
@@ -792,7 +891,10 @@ class LearnedSparseRetrieval:
 
         # 하이브리드 검색 수행
         res = self.col.hybrid_search(
-            [sparse_req, dense_req], rerank=rerank, limit=topk, output_fields=["context"]
+            [sparse_req, dense_req],
+            rerank=rerank,
+            limit=topk,
+            output_fields=["context"],
         )
-        
+
         return res

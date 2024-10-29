@@ -37,8 +37,8 @@ from transformers import (
 )
 
 
-class ExtractiveQA():
-    
+class ExtractiveQA:
+
     def __init__(self, args, config_path, test_datasets, valid_datasets):
         self.args = args
         self.config_path = config_path
@@ -50,34 +50,31 @@ class ExtractiveQA():
         self.model_config = None
 
         config_args = self.load_model()
-        
+
         self.model_args = config_args[0]
         self.data_args = config_args[1]
         self.training_args = config_args[2]
 
-    
         self.logger = logging.getLogger(__name__)
 
     def load_model(self):
-        
+
         model_args, data_args, training_args = json_to_Arguments(self.config_path)
-        model_path = os.path.join(training_args.output_dir,"Extractive")
+        model_path = os.path.join(training_args.output_dir, "Extractive")
 
         # Model 불러오기
-        self.model_config = AutoConfig.from_pretrained(
-            model_path
-        )
+        self.model_config = AutoConfig.from_pretrained(model_path)
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path,
             use_fast=True,
         )
         # 학습된 모델 불러오기
         self.model = AutoModelForQuestionAnswering.from_pretrained(
-            model_path, # train에서 finetuned_model 불러옴
+            model_path,  # train에서 finetuned_model 불러옴
             from_tf=bool(".ckpt" in model_path),
             config=self.model_config,
         )
-        
+
         training_args = TrainingArguments(**training_args)
         if self.args.do_predict:
             print("Prediction을 수행")
@@ -86,9 +83,8 @@ class ExtractiveQA():
             print("Evaluation을 수행")
             training_args.do_eval = True
 
-
         return model_args, data_args, training_args
-    
+
     def predict(self, datasets, output_dir=None):
         # QA 모델의 경우 Retrieval의 결과가 필요함
         # Datasets : Retrieval 결과에 대한 datasets
@@ -97,13 +93,18 @@ class ExtractiveQA():
         # eval 혹은 prediction에서만 사용함
         column_names = datasets["validation"].column_names
 
-        question_column_name = "question" if "question" in column_names else column_names[0]
-        context_column_name = "context" if "context" in column_names else column_names[1]
+        question_column_name = (
+            "question" if "question" in column_names else column_names[0]
+        )
+        context_column_name = (
+            "context" if "context" in column_names else column_names[1]
+        )
         answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
         # Padding에 대한 옵션을 설정합니다.
         # (question|context) 혹은 (context|question)로 세팅 가능합니다.
         pad_on_right = self.tokenizer.padding_side == "right"
+
         # Validation preprocessing / 전처리를 진행합니다.
         def prepare_validation_features(examples):
             # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
@@ -116,7 +117,7 @@ class ExtractiveQA():
                 stride=self.data_args.doc_stride,
                 return_overflowing_tokens=True,
                 return_offsets_mapping=True,
-                return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+                return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
                 padding="max_length" if self.data_args.pad_to_max_length else False,
             )
 
@@ -142,8 +143,8 @@ class ExtractiveQA():
                     for k, o in enumerate(tokenized_examples["offset_mapping"][i])
                 ]
             return tokenized_examples
-        
-        eval_dataset = datasets["validation"] # 수정 필요
+
+        eval_dataset = datasets["validation"]  # 수정 필요
 
         # Validation Feature 생성
         eval_dataset = eval_dataset.map(
@@ -194,11 +195,12 @@ class ExtractiveQA():
 
         # Set Method
         metric = load_metric("squad")
+
         def compute_metrics(p: EvalPrediction) -> Dict:
             return metric.compute(predictions=p.predictions, references=p.label_ids)
 
         # Set Output_dir : test dataset과 validation dataset
-        self.training_args.output_dir=output_dir
+        self.training_args.output_dir = output_dir
 
         # Trainer 초기화
         trainer = QuestionAnsweringTrainer(
@@ -210,7 +212,7 @@ class ExtractiveQA():
             tokenizer=self.tokenizer,
             data_collator=data_collator,
             post_process_function=post_processing_function,
-            compute_metrics=compute_metrics
+            compute_metrics=compute_metrics,
         )
 
         self.logger.info("*** Evaluate ***")
@@ -227,11 +229,9 @@ class ExtractiveQA():
             )
             return predictions
 
-        if self.training_args.do_eval: # 여기가 validation의 answer를 못가져감..
+        if self.training_args.do_eval:  # 여기가 validation의 answer를 못가져감..
             metrics = trainer.evaluate()
             metrics["eval_samples"] = len(eval_dataset)
 
             trainer.log_metrics("test", metrics)
             trainer.save_metrics("test", metrics)
-        
-        

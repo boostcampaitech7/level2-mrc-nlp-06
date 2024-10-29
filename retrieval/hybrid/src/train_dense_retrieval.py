@@ -10,7 +10,12 @@ from pprint import pprint
 
 from datasets import Dataset, concatenate_datasets, load_dataset, load_from_disk
 from transformers import TrainingArguments
-from transformers import AutoConfig, AutoTokenizer, AutoModel, AutoModelForQuestionAnswering
+from transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    AutoModel,
+    AutoModelForQuestionAnswering,
+)
 from transformers import BertModel, BertPreTrainedModel, BertTokenizer
 from transformers import AdamW, get_linear_schedule_with_warmup
 
@@ -26,21 +31,30 @@ from bi_encoder import BiRetrieval, BertEncoder
 from jsonargparse import ArgumentParser, ActionConfigFile
 
 seed = 2024
-random.seed(seed) # python random seed 고정
-np.random.seed(seed) # numpy random seed 고정
+random.seed(seed)  # python random seed 고정
+np.random.seed(seed)  # numpy random seed 고정
 
 if __name__ == "__main__":
-    
+
     parser = ArgumentParser(description="")
 
-    parser.add_argument("-c", "--config", action=ActionConfigFile, help="this config file is hybrid_retrieval.json in ../config/ foler.") # action="store"
+    parser.add_argument(
+        "-c",
+        "--config",
+        action=ActionConfigFile,
+        help="this config file is hybrid_retrieval.json in ../config/ foler.",
+    )  # action="store"
     parser.default_config_files = ["../config/dense_retrieval.json"]
 
-    parser.add_argument("--wiki_path", metavar="wikipedia_documents.json", type=str, help="")
+    parser.add_argument(
+        "--wiki_path", metavar="wikipedia_documents.json", type=str, help=""
+    )
     parser.add_argument("--data_path", metavar="./data/", type=str, help="")
     parser.add_argument("--train_folder", metavar="train_dataset/", type=str, help="")
     parser.add_argument("--eval_folder", metavar="eval_dataset/", type=str, help="")
-    parser.add_argument("--model_name_or_path", metavar="klue/bert-base", type=str, help="")
+    parser.add_argument(
+        "--model_name_or_path", metavar="klue/bert-base", type=str, help=""
+    )
 
     parser.add_argument("--train", metavar=True, type=bool, help="")
     parser.add_argument("--train_samples", metavar=True, type=bool, help="")
@@ -55,8 +69,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--topk", metavar=1, type=int, help="")
     parser.add_argument("--test_ks", metavar=[1, 2], type=list, help="")
-
-
 
     args = parser.parse_args()
     model_args = args
@@ -82,16 +94,14 @@ if __name__ == "__main__":
     topk = config.topk
     test_ks = config.test_ks
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print(config)
-    
-
 
     train_dataset_path = data_path + train_folder
 
-    #dataset = load_dataset("squad_kor_v1")["train"]
-    #dataset = json.load(wikipedia_path)["train"]
+    # dataset = load_dataset("squad_kor_v1")["train"]
+    # dataset = json.load(wikipedia_path)["train"]
 
     # Test sparse
     print("load dataset")
@@ -99,7 +109,7 @@ if __name__ == "__main__":
     full_ds = concatenate_datasets(
         [
             org_dataset["train"].flatten_indices(),
-            #org_dataset["validation"].flatten_indices(),
+            # org_dataset["validation"].flatten_indices(),
         ]
     )  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
     print("*" * 40, "query dataset", "*" * 40)
@@ -110,8 +120,7 @@ if __name__ == "__main__":
     dataset = dataset[sample_idx] if train_samples else dataset
     print(len(dataset["question"]))
 
-    print("model_path:",model_name_or_path)
-
+    print("model_path:", model_name_or_path)
 
     args = TrainingArguments(
         output_dir="dense_retrieval",
@@ -120,13 +129,12 @@ if __name__ == "__main__":
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         num_train_epochs=epochs,
-        weight_decay=weight_decay
+        weight_decay=weight_decay,
     )
-
 
     print("bi encoder start")
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    #tokenizer = BertTokenizer.from_pretrained(model_name_or_path)
+    # tokenizer = BertTokenizer.from_pretrained(model_name_or_path)
     q_encoder = BertEncoder.from_pretrained(model_name_or_path).to(args.device)
     p_encoder = BertEncoder.from_pretrained(model_name_or_path).to(args.device)
 
@@ -136,13 +144,14 @@ if __name__ == "__main__":
         num_neg=num_neg,
         tokenizer=tokenizer,
         q_encoder=q_encoder,
-        p_encoder=p_encoder
+        p_encoder=p_encoder,
     )
 
     # to save set the path
     if not model_name_or_path.startswith("../model/"):
         model_name_or_path = "../model/" + model_name_or_path
-        if model_name_or_path.endswith("/"): model_name_or_path = model_name_or_path[:-1]
+        if model_name_or_path.endswith("/"):
+            model_name_or_path = model_name_or_path[:-1]
 
     if train:
         print("training start")
@@ -150,8 +159,9 @@ if __name__ == "__main__":
         retriever.save_pretrained(model_name_or_path)
 
         query = ["유아인에게 타고난 배우라고 말한 드라마 밀회의 감독은?"]
-        doc_scores, doc_indices = retriever.get_relevant_doc_dot_prod(query=query, topk=5)
-
+        doc_scores, doc_indices = retriever.get_relevant_doc_dot_prod(
+            query=query, topk=5
+        )
 
         for i in range(len(doc_scores)):
             print("query:", query[i])
@@ -159,17 +169,21 @@ if __name__ == "__main__":
                 id, score = doc_indices[i][j], doc_scores[i][j]
                 print(f"Top {j} passage id: {id}, score: {score}")
                 pprint(retriever.dataset["context"][id])
-    
+
     if evaluate:
         print("evaluation start")
         retriever.from_pretrained(model_name_or_path)
-        #retriever.eval()
+        # retriever.eval()
         retriever.q_encoder.eval()
         retriever.p_encoder.eval()
 
-        query = ["유럽 초기에 천문학자가 누구에게서 관측소 자금을 후원 받고 큰 규모의 관측 기구를 만들었을까?", "유아인에게 타고난 배우라고 말한 드라마 밀회의 감독은?"]
-        doc_scores, doc_indices = retriever.get_relevant_doc_dot_prod(query=query, topk=5)
-
+        query = [
+            "유럽 초기에 천문학자가 누구에게서 관측소 자금을 후원 받고 큰 규모의 관측 기구를 만들었을까?",
+            "유아인에게 타고난 배우라고 말한 드라마 밀회의 감독은?",
+        ]
+        doc_scores, doc_indices = retriever.get_relevant_doc_dot_prod(
+            query=query, topk=5
+        )
 
         for i in range(len(doc_scores)):
             print("query:", query[i])
@@ -177,4 +191,3 @@ if __name__ == "__main__":
                 id, score = doc_indices[i][j], doc_scores[i][j]
                 print(f"Top {j} passage id: {id}, score: {score}")
                 pprint(retriever.dataset["context"][id])
-

@@ -1,5 +1,5 @@
 ## Hybrid Retrieval
-Sparse retrieval과 dense retrieval의 혼합 사용 
+Sparse retrieval과 dense retrieval의 혼합 사용
 - sparse retrieval의 단어 수준의 직접적인 비교와 dense retrieval의 문맥적 의미의 유사성을 이용한 장점 결합
 
 ## Requirements
@@ -13,13 +13,13 @@ pprint
 ```
 
 ## Usage
-**Config**  
+**Config**
 - [dense retrieval config](./config/dense_retrieval.json)
  ```
   {
   "wiki_path": "../../../../../data/wikipedia_documents.json", # path to wikipedia documents
   "data_path": "../../../../../data/", # path to train/validation dataset
-    "train_folder": "train_dataset/", 
+    "train_folder": "train_dataset/",
     "eval_folder": "eval_dataset/",
   "model_name_or_path": "klue/bert-base", # path to model
   "train": true, # train mode on/off
@@ -31,11 +31,11 @@ pprint
     "learning_rate": 2e-5,
     "weight_decay": 1e-2,
   "evaluate": true, # eval mode on/off
-  "topk" : 1, # extract top k documents 
+  "topk" : 1, # extract top k documents
   "test_ks" : [1, 5, 10, 15, 20] # test topk list
   }
   ```
-  
+
 - [hybrid retrieval config](./config/hybrid_retrieval.json)
  ```
   {
@@ -75,9 +75,7 @@ retriever.retrieve(retriever_type=retriever_type, query_or_dataset=queries, topk
 ```
 
 **결과 저장**
-- 학습한 모델들은 `./model/` 폴더에, retrieval 결과는 `./outputs/`폴더에 csv 파일로 저장  
+- 학습한 모델들은 `./model/` 폴더에, retrieval 결과는 `./outputs/`폴더에 csv 파일로 저장
 ```python
 retriever.test(retriever_type=retriever_type, query_or_dataset=queries, topk=topk)
 ```
-
-

@@ -6,8 +6,8 @@ import numpy as np
 import torch
 import argparse
 
-print(os.path.join(os.getcwd(),"reader"))
-sys.path.append(os.path.join(os.getcwd(),"reader"))
+print(os.path.join(os.getcwd(), "reader"))
+sys.path.append(os.path.join(os.getcwd(), "reader"))
 
 from typing import NoReturn
 from datasets import DatasetDict, load_from_disk, load_metric
@@ -23,43 +23,60 @@ from transformers import (
 import nltk
 
 from trainer_ext import QuestionAnsweringTrainer
-from utils.utils_mrc import check_no_error, postprocess_qa_predictions, json_to_Arguments
+from utils.utils_mrc import (
+    check_no_error,
+    postprocess_qa_predictions,
+    json_to_Arguments,
+)
 from utils.preprocessing import get_train_dataset
 
 seed = 2024
 deterministic = False
 
-random.seed(seed) # python random seed 고정
-np.random.seed(seed) # numpy random seed 고정
-torch.manual_seed(seed) # torch random seed 고정
+random.seed(seed)  # python random seed 고정
+np.random.seed(seed)  # numpy random seed 고정
+torch.manual_seed(seed)  # torch random seed 고정
 torch.cuda.manual_seed_all(seed)
-if deterministic: # cudnn random seed 고정 - 고정 시 학습 속도가 느려질 수 있습니다. 
-	torch.backends.cudnn.deterministic = True
-	torch.backends.cudnn.benchmark = False
+if deterministic:  # cudnn random seed 고정 - 고정 시 학습 속도가 느려질 수 있습니다.
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 logger = logging.getLogger(__name__)
 
-def main(): 
+
+def main():
     # Load Arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="config 폴더에 있는 json 파일을 로드하세요", default="../../config/base_config.json")
-    parser.add_argument("--do_train", action="store_true", required=True, help="train을 할 경우에 활성화")
-    parser.add_argument("--do_eval", action="store_true", help="Eval도 같이 할 경우에 활성화")
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="config 폴더에 있는 json 파일을 로드하세요",
+        default="../../config/base_config.json",
+    )
+    parser.add_argument(
+        "--do_train",
+        action="store_true",
+        required=True,
+        help="train을 할 경우에 활성화",
+    )
+    parser.add_argument(
+        "--do_eval", action="store_true", help="Eval도 같이 할 경우에 활성화"
+    )
     args = parser.parse_args()
     model_args, data_args, training_args = json_to_Arguments(args.config)
 
     training_args = TrainingArguments(**training_args)
 
     if args.do_train:
-        training_args.do_train=True
+        training_args.do_train = True
     else:
-        training_args.do_train=False
+        training_args.do_train = False
 
     if args.do_eval:
-        training_args.do_eval=True
+        training_args.do_eval = True
     else:
-        training_args.do_eval=False
+        training_args.do_eval = False
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
@@ -85,16 +102,15 @@ def main():
         config=config,
     )
 
-
     print(
         type(training_args),
         type(model_args),
         type(datasets),
         type(tokenizer),
         type(model),
-    )    
+    )
     print("***** Train Extractive QA *****")
-    training_args.output_dir=str(os.path.join(training_args.output_dir,"Extractive"))
+    training_args.output_dir = str(os.path.join(training_args.output_dir, "Extractive"))
     run_mrc_extract(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
@@ -104,7 +120,8 @@ def run_mrc_extract(
     model_args: dict,
     datasets: DatasetDict,
     tokenizer,
-    model,) -> NoReturn:
+    model,
+) -> NoReturn:
 
     # dataset을 전처리합니다.
     # training과 evaluation에서 사용되는 전처리는 아주 조금 다른 형태를 가집니다.
@@ -123,15 +140,31 @@ def run_mrc_extract(
     pad_on_right = tokenizer.padding_side == "right"
 
     # 오류가 있는지 확인합니다.
-    last_checkpoint, max_seq_length = check_no_error(data_args, training_args, datasets, tokenizer)
-    
+    last_checkpoint, max_seq_length = check_no_error(
+        data_args, training_args, datasets, tokenizer
+    )
+
     if training_args.do_train:
         if training_args.do_eval:
-            train_dataset, eval_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
-                                                            column_names,qca_names,pad_on_right)
+            train_dataset, eval_dataset = get_train_dataset(
+                tokenizer,
+                data_args,
+                training_args,
+                datasets,
+                column_names,
+                qca_names,
+                pad_on_right,
+            )
         else:
-            train_dataset = get_train_dataset(tokenizer, data_args, training_args, datasets, 
-                                                            column_names,qca_names,pad_on_right)
+            train_dataset = get_train_dataset(
+                tokenizer,
+                data_args,
+                training_args,
+                datasets,
+                column_names,
+                qca_names,
+                pad_on_right,
+            )
 
     data_collator = DataCollatorWithPadding(
         tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
@@ -223,5 +256,6 @@ def run_mrc_extract(
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 
+
 if __name__ == "__main__":
-	main()
+    main()

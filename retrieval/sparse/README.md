@@ -1,4 +1,4 @@
-## Sparse Passage Embedding 
+## Sparse Passage Embedding
 - Sparse Passage Embedding을 활용한 문서 검색을 실행할 수 있는 코드입니다.
 - 전통적인 통계 기반 방법인 TF-IDF, BM25를 이용할 수 있습니다 (`SparseRetriever` 클래스)
 - 고도화된 임베딩 기법이 적용된 learned sparse retriever 모델인 SPLADE, BGE-M3을 이용할 수 있습니다 (`LearnedSparseRetriever` 클래스).
@@ -101,8 +101,8 @@ retriever = LearnedSparseRetrieval(
 
 
 ### Functions in `SparseRetrieval` Class
-**`get_sparse_embedding_tfidf()`**, **`get_sparse_embedding_bm25()`**, 
-- TF-IDF 임베딩을 생성하고 저장합니다. 
+**`get_sparse_embedding_tfidf()`**, **`get_sparse_embedding_bm25()`**,
+- TF-IDF 임베딩을 생성하고 저장합니다.
 - 이미 임베딩 결과가 저장된 파일이 있으면 이를 불러오고, 없으면 새로 생성
 
 **`retrieve()`**
@@ -111,11 +111,11 @@ retriever = LearnedSparseRetrieval(
 - save: 검색 결과를 CSV 파일로 저장할지 여부. default True
 - retrieval_save_path: 검색 결과 저장 경로. default "../outputs/".
 
-**`get_relevant_doc_tfidf()`**, **`get_relevant_doc_bm25()`**, 
+**`get_relevant_doc_tfidf()`**, **`get_relevant_doc_bm25()`**,
 - query: 쿼리 문자열
 - k: default 10
 
-**`get_relevant_doc_bulk_tfidf()`**, **`get_relevant_doc_bulk_bm25()`**, 
+**`get_relevant_doc_bulk_tfidf()`**, **`get_relevant_doc_bulk_bm25()`**,
 - queries: 쿼리 리스트
 - k: default 10
 

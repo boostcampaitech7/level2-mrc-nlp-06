@@ -1,5 +1,6 @@
-def get_train_dataset(tokenizer, data_args, training_args, datasets, column_names, qca_names
-                      ,pad_on_right):
+def get_train_dataset(
+    tokenizer, data_args, training_args, datasets, column_names, qca_names, pad_on_right
+):
 
     question_column_name = qca_names[0]
     context_column_name = qca_names[1]
@@ -17,7 +18,7 @@ def get_train_dataset(tokenizer, data_args, training_args, datasets, column_name
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -82,6 +83,7 @@ def get_train_dataset(tokenizer, data_args, training_args, datasets, column_name
                     tokenized_examples["end_positions"].append(token_end_index + 1)
 
         return tokenized_examples
+
     # Validation preprocessing
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
@@ -94,7 +96,7 @@ def get_train_dataset(tokenizer, data_args, training_args, datasets, column_name
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -120,7 +122,7 @@ def get_train_dataset(tokenizer, data_args, training_args, datasets, column_name
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
         return tokenized_examples
-    
+
     if training_args.do_train:
         if "train" not in datasets:
             raise ValueError("--do_train requires a train dataset")

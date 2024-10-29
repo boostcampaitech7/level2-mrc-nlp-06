@@ -25,7 +25,8 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from reader.utils.utils_mrc import json_to_Arguments, postprocess_qa_predictions
 from reader.extractive.src.trainer_ext import QuestionAnsweringTrainer
 
-class ExtractiveQA():
+
+class ExtractiveQA:
     def __init__(self, config_path):
         self.config_path = config_path
 
@@ -34,7 +35,7 @@ class ExtractiveQA():
         self.model = None
 
         config_args = self.load_model()
-        
+
         self.model_args = config_args[0]
         self.data_args = config_args[1]
         self.training_args = config_args[2]
@@ -43,38 +44,41 @@ class ExtractiveQA():
 
     def load_model(self):
         model_args, data_args, training_args = json_to_Arguments(self.config_path)
-        model_path = os.path.join(training_args.output_dir, 'Extractive')
+        model_path = os.path.join(training_args.output_dir, "Extractive")
 
         # Model 불러오기
-        self.model_config = AutoConfig.from_pretrained(
-            model_path
-        )
+        self.model_config = AutoConfig.from_pretrained(model_path)
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path,
             use_fast=True,
         )
         # 학습된 모델 불러오기
         self.model = AutoModelForQuestionAnswering.from_pretrained(
-            model_path, # train에서 finetuned_model 불러옴
+            model_path,  # train에서 finetuned_model 불러옴
             from_tf=bool(".ckpt" in model_path),
             config=self.model_config,
         )
-        
+
         training_args = TrainingArguments(**training_args)
         training_args.do_predict = True
-        
+
         return model_args, data_args, training_args
-    
+
     def predict(self, datasets, output_dir):
         column_names = datasets.column_names
 
-        question_column_name = "question" if "question" in column_names else column_names[0]
-        context_column_name = "context" if "context" in column_names else column_names[1]
+        question_column_name = (
+            "question" if "question" in column_names else column_names[0]
+        )
+        context_column_name = (
+            "context" if "context" in column_names else column_names[1]
+        )
         answer_column_name = "answers" if "answers" in column_names else column_names[2]
 
         # Padding에 대한 옵션을 설정합니다.
         # (question|context) 혹은 (context|question)로 세팅 가능합니다.
         pad_on_right = self.tokenizer.padding_side == "right"
+
         # Validation preprocessing / 전처리를 진행합니다.
         def prepare_validation_features(examples):
             # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
@@ -87,7 +91,7 @@ class ExtractiveQA():
                 stride=self.data_args.doc_stride,
                 return_overflowing_tokens=True,
                 return_offsets_mapping=True,
-                return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+                return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
                 padding="max_length" if self.data_args.pad_to_max_length else False,
             )
 
@@ -145,21 +149,29 @@ class ExtractiveQA():
                 output_dir=self.training_args.output_dir,
             )
             # Metric을 구할 수 있도록 Format을 맞춰줍니다.
-            formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
+            formatted_predictions = [
+                {"id": k, "prediction_text": v} for k, v in predictions.items()
+            ]
 
             if training_args.do_predict:
                 return formatted_predictions
             elif training_args.do_eval:
-                references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in datasets]
-                return EvalPrediction(predictions=formatted_predictions, label_ids=references)
+                references = [
+                    {"id": ex["id"], "answers": ex[answer_column_name]}
+                    for ex in datasets
+                ]
+                return EvalPrediction(
+                    predictions=formatted_predictions, label_ids=references
+                )
 
         # Set Method
         metric = load_metric("squad")
+
         def compute_metrics(p: EvalPrediction) -> Dict:
             return metric.compute(predictions=p.predictions, references=p.label_ids)
 
         # Set Output_dir : test dataset과 validation dataset
-        self.training_args.output_dir=output_dir
+        self.training_args.output_dir = output_dir
 
         # Trainer 초기화
         trainer = QuestionAnsweringTrainer(
@@ -171,17 +183,21 @@ class ExtractiveQA():
             tokenizer=self.tokenizer,
             data_collator=data_collator,
             post_process_function=post_processing_function,
-            compute_metrics=compute_metrics
+            compute_metrics=compute_metrics,
         )
 
         self.logger.info("*** Evaluate ***")
 
         #### eval dataset & eval example - predictions.json 생성됨
         if self.training_args.do_predict:
-            predictions = trainer.predict(test_dataset=eval_dataset, test_examples=datasets)
+            predictions = trainer.predict(
+                test_dataset=eval_dataset, test_examples=datasets
+            )
 
             # predictions.json 은 postprocess_qa_predictions() 호출시 이미 저장됩니다.
-            print("No metric can be presented because there is no correct answer given. Job done!")
+            print(
+                "No metric can be presented because there is no correct answer given. Job done!"
+            )
 
         if self.training_args.do_eval:
             metrics = trainer.evaluate()
@@ -189,6 +205,5 @@ class ExtractiveQA():
 
             trainer.log_metrics("test", metrics)
             trainer.save_metrics("test", metrics)
-        
+
         return predictions
-    

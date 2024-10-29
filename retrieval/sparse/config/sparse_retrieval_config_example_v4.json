@@ -1,8 +1,0 @@
-{
-    "corpus_data_path": "/data/ephemeral/home/jh/data/datasets/v0.0.4/wikipedia_documents.json",
-    "embedding_method": "bm25",
-    "topk": 10,
-    "tokenizer_model_name": "klue/bert-base",
-    "eval_data_path": "/data/ephemeral/home/jh/data/datasets/v0.0.4/",
-    "eval_metric": ["hit", "mrr"]
-}

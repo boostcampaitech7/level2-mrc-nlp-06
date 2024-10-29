@@ -27,7 +27,7 @@ ODQA Task를 Inference하는 코드
 
 > 현재 Extractive만 사용 가능
 
-* Retrieval에서 
+* Retrieval에서
 
 * [REAMDE.md 참고](https://github.com/boostcampaitech7/level2-mrc-nlp-06/tree/develop/reader/extractive/README.md)
 
@@ -35,23 +35,23 @@ ODQA Task를 Inference하는 코드
 ### 3. Inference 실행
 
 * 최상위 폴더에서 `inference.sh` 실행
-  
-  
-    * `ODQA/config` 파일 설정 
-    
+
+
+    * `ODQA/config` 파일 설정
+
         * `qa_config`는 reader 모델의 config 위치로 설정
-    
+
         * `retrieval_config`는 사용했던 config 파일 이름으로 설정
-    
+
         * `datasets` 는 데이터셋 경로로 설정
-    
+
     * Evaluation (Validation case)만 진행하는 경우
-    
+
       * ```shell
       $ bash inference.sh --qa ext --retrieval sparse --do_eval
-    
+
       Predictions를 저장하고 싶은 경우
-    
+
       * ```shell
         $ bash inference.sh --qa ext --retrieval sparse --do_predict
         ```
@@ -59,7 +59,7 @@ ODQA Task를 Inference하는 코드
       * ```shell
         $ bash inference.sh --qa ext --retrieval sparse --do_predict --do_valid # (Validation 결과도 같이 저장)
         ```
-    
+
 	    * `ODQA/predictions/validation`에도 `predictions.json, n-best predictions.json, predictions` 저장
         * validation의 경우 실제 정답 (`answer`)도 포함되어있음
 
@@ -89,7 +89,7 @@ def get_predictions(path):
                 predictions_per_id[id].append(pred_data[id])
             else:
                 predictions_per_id[id] = [pred_data[id]]
-        
+
     return predictions_per_id
 
 def get_preds_json(preds, result_dir):
@@ -100,7 +100,7 @@ def get_preds_json(preds, result_dir):
         print(counts)
     with open(os.path.join(result_dir,"ensemble.json"),"w") as f:
         json.dump(ensemble, f, ensure_ascii=False, indent=4)
-    
+
     print(" ***** ensemble task complete ***** ")
 ```
 
@@ -116,7 +116,7 @@ def get_preds_json(preds, result_dir):
 ```python
 # inference.py
 
-def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_datasets=None):  
+def run_odqa(args, inference_config, test_datasets, wiki_path, pred_dir, valid_datasets=None):
     # Load QA Model
     match args.qa:
         case "ext":
@@ -163,9 +163,9 @@ if args.do_predict:
         dict_to_json(os.path.join(output_dir,"predictions.json"),
                      os.path.join(output_dir,"prediction_with_ans.json"),
                      answers)
-        
+
 elif args.do_eval:
-    output_dir = os.path.join(pred_dir, "eval") 
+    output_dir = os.path.join(pred_dir, "eval")
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
 
@@ -198,13 +198,13 @@ inference를 하는 과정과 Retrieval를 학습하는 과정에서 발생
 
     * `/retrieval/sparse/sparse_retrieval.py` 에서 import 부분에 `utils.utils_sparse_retrieval`를 `utils_sparse_retrieval`로만 import
     * 반대로 위 모듈을 찾을 수 없다면, `utils.`을 붙여서 import
-    
+
     ```python
     # /retrieval/sparse/sparse_retrieval.py
-    
+
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils_sparse_retrieval import timer, hit, mrr # opt.1
     from utils.utils_sparse_retrieval import timer, hit, mrr # opt.2
     ```
-    
+
     > `utils.`을 붙이거나 떼거나 두 경우를 테스트해서 실행되는 코드로 진행

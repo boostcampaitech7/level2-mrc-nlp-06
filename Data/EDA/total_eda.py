@@ -41,10 +41,11 @@ with open("../data/wikipedia_documents.json", "r") as f:
 
 wiki_df = pd.DataFrame(wiki)
 wiki_df = wiki_df.transpose()
-wiki_df = wiki_df[['title','text','document_id']]  # 필요한 column만 남기기
+wiki_df = wiki_df[["title", "text", "document_id"]]  # 필요한 column만 남기기
 wiki_df.head()
 
 # train, validation 데이터 불러오기 (wikipedia 데이터와의 일치 확인 목적)
+
 
 # dataset을 pandas dataframe으로 변환하는 함수
 def dataset_to_df(dataset_name):
@@ -52,15 +53,17 @@ def dataset_to_df(dataset_name):
 
     # 필요한 항목 추출
     for item in dataset_name:
-        data_list.append({
-            'title': item['title'],
-            'context': item['context'],
-            'question': item['question'],
-            'id': item['id'],
-            'answer_start': item['answers']['answer_start'][0],
-            'answer_text': item['answers']['text'][0],
-            'document_id': item['document_id'],
-        })
+        data_list.append(
+            {
+                "title": item["title"],
+                "context": item["context"],
+                "question": item["question"],
+                "id": item["id"],
+                "answer_start": item["answers"]["answer_start"][0],
+                "answer_text": item["answers"]["text"][0],
+                "document_id": item["document_id"],
+            }
+        )
 
     # pandas dataframe으로 변환
     result_df = pd.DataFrame(data_list)
@@ -68,7 +71,7 @@ def dataset_to_df(dataset_name):
 
 
 dataset = load_from_disk("../data/train_dataset/")
-train_data, valid_data = dataset['train'], dataset['validation']
+train_data, valid_data = dataset["train"], dataset["validation"]
 train_df = dataset_to_df(train_data)
 valid_df = dataset_to_df(valid_data)
 
@@ -92,34 +95,44 @@ print(f"unique한 document id 개수: {len(wiki_df.document_id.unique())}")
 # A-2. 동일한 문장이 여러 문서에 사용된 경우 (91/7677건)
 
 # 중복된 데이터 찾기 (text를 기준으로)
-duplicates = wiki_df[wiki_df.duplicated(subset=['text'], keep=False)]
+duplicates = wiki_df[wiki_df.duplicated(subset=["text"], keep=False)]
 
 # title이 동일한 경우의 중복 건수
-same_title_duplicates = duplicates[duplicates.duplicated(subset=['text', 'title'], keep=False)]
+same_title_duplicates = duplicates[
+    duplicates.duplicated(subset=["text", "title"], keep=False)
+]
 
 # title이 다른 경우의 중복 건수
-different_title_duplicates = duplicates[~duplicates.duplicated(subset=['text', 'title'], keep=False)]
+different_title_duplicates = duplicates[
+    ~duplicates.duplicated(subset=["text", "title"], keep=False)
+]
 
 # unique한 text
-wiki_df_unique = wiki_df.drop_duplicates(subset=['text'])
+wiki_df_unique = wiki_df.drop_duplicates(subset=["text"])
 
 # 결과 출력
 print(f"전체 중복 행 수: {len(duplicates)}")
 print(f"Title이 동일한 중복 건수: {len(same_title_duplicates)}")
 print(f"Title이 다른 중복 건수: {len(different_title_duplicates)}")
-print("-"*50)
+print("-" * 50)
 print(f"전체 wiki 데이터 수: {len(wiki_df)}")
 print(f"text 중복 제거한 wiki 데이터 수: {len(wiki_df_unique)}")
 
 # 같은 문서가 여러 번 수집되어 중복 발생한 예시
-wiki_df[wiki_df['title']=='로봇 배제 표준']
+wiki_df[wiki_df["title"] == "로봇 배제 표준"]
 
-wiki_df[wiki_df['title']=='아미타불']
+wiki_df[wiki_df["title"] == "아미타불"]
 
 # 동일한 문장이 여러 문서에 사용도니 경우 예시
-wiki_df[wiki_df.text == "김정은의 집권 이후 조선민주주의인민공화국은 예산제에서 전면적으로 독립채산제로 설정을 하였으며 특히 평양 집적회로 공장과 평양 집적회로 시험 공장과 리철호 가 사업하는 기계 공장에도 전면적으로 독립채산제를 갖추어 나가기 시작하였다.\n\n2014년에는 기업이 가격을 제정할 수 있는 상품의 범위를 확대한 것으로 여기에는 대학에서 첨단기술제품을 수요자와 계약에 따라 생산하여 내화 및 외화로 판매하는 제품의 가격과 주문계약으로 생산한 제품 가운데 외화로 원가를 보상하여야 할 제품의 외화가격 등이 포함되었다.\n\n특히 반도체나 특히 소프트웨어등을 개발하여 판매한 수익을 자체로 예산에 포함시켜서 수익사업에 나설 수 있도록 전면적으로 허용을 하였으며 특히 국정가격의 판매를 전면적으로 없애고 자율적으로 시장에 의하여 조절할 수 있도록 허용을 하였다."]
+wiki_df[
+    wiki_df.text
+    == "김정은의 집권 이후 조선민주주의인민공화국은 예산제에서 전면적으로 독립채산제로 설정을 하였으며 특히 평양 집적회로 공장과 평양 집적회로 시험 공장과 리철호 가 사업하는 기계 공장에도 전면적으로 독립채산제를 갖추어 나가기 시작하였다.\n\n2014년에는 기업이 가격을 제정할 수 있는 상품의 범위를 확대한 것으로 여기에는 대학에서 첨단기술제품을 수요자와 계약에 따라 생산하여 내화 및 외화로 판매하는 제품의 가격과 주문계약으로 생산한 제품 가운데 외화로 원가를 보상하여야 할 제품의 외화가격 등이 포함되었다.\n\n특히 반도체나 특히 소프트웨어등을 개발하여 판매한 수익을 자체로 예산에 포함시켜서 수익사업에 나설 수 있도록 전면적으로 허용을 하였으며 특히 국정가격의 판매를 전면적으로 없애고 자율적으로 시장에 의하여 조절할 수 있도록 허용을 하였다."
+]
 
-wiki_df[wiki_df.text == '삼마지(,\n,\n,\n,\n,\n,\n,\n,\n)는\n설일체유부의 5위 75법에서 심소법(心所法: 46가지) 중\n대지법(大地法: 10가지) 가운데 하나이며,\n유식유가행파와 법상종의 5위 100법에서 심소법(心所法: 51가지) 중\n별경심소(別境心所: 5가지) 가운데 하나이다.pp=69-81loc="三摩地". 2012년 9월 22일에 확인\n삼마지(三摩地)는 심일경성(心一境性)의 마음작용이다. 즉 마음(6식 또는 8식, 즉 심왕, 즉 심법)을 평등(平等)하게 유지하여 즉 혼침(惛沈)과 도거(掉舉)를 멀리 떠난 상태에서 그것이 하나의 대상에 전념(專念, 專住)하게 하는 마음작용이다. 달리 말하면, 마음(6식 또는 8식, 즉 심왕, 즉 심법)을 한 곳에 모아 산란하지 않게 하는 마음작용이다. 마치 뱀이 죽통(竹筒)에 들어가면 바로 펴지듯이 마음(6식 또는 8식, 즉 심왕, 즉 심법)이 삼마지에 들면 산란되지 않고 한결같게 된다. 문자 그대로 번역하여 () 삼마제(三摩提) 삼마제(三摩帝)라 하기도 하며, 의역하여 선정(禪定)loc="禪定(선정)". 2013년 3월 2일에 확인|ps=]]() 등지(等持) 정정(正定) 정의(定意) 조직정(調直定) 정심행처(正心行處)라 하기도 한다.pp=69-81세친 지음, 현장 한역, 권오민 번역|p=163 / 1397loc="三摩地". 2012년 9월 22일에 확인loc="三摩地(삼마지)". 2012년 9월 22일에 확인 (참고: 삼매())']
+wiki_df[
+    wiki_df.text
+    == '삼마지(,\n,\n,\n,\n,\n,\n,\n,\n)는\n설일체유부의 5위 75법에서 심소법(心所法: 46가지) 중\n대지법(大地法: 10가지) 가운데 하나이며,\n유식유가행파와 법상종의 5위 100법에서 심소법(心所法: 51가지) 중\n별경심소(別境心所: 5가지) 가운데 하나이다.pp=69-81loc="三摩地". 2012년 9월 22일에 확인\n삼마지(三摩地)는 심일경성(心一境性)의 마음작용이다. 즉 마음(6식 또는 8식, 즉 심왕, 즉 심법)을 평등(平等)하게 유지하여 즉 혼침(惛沈)과 도거(掉舉)를 멀리 떠난 상태에서 그것이 하나의 대상에 전념(專念, 專住)하게 하는 마음작용이다. 달리 말하면, 마음(6식 또는 8식, 즉 심왕, 즉 심법)을 한 곳에 모아 산란하지 않게 하는 마음작용이다. 마치 뱀이 죽통(竹筒)에 들어가면 바로 펴지듯이 마음(6식 또는 8식, 즉 심왕, 즉 심법)이 삼마지에 들면 산란되지 않고 한결같게 된다. 문자 그대로 번역하여 () 삼마제(三摩提) 삼마제(三摩帝)라 하기도 하며, 의역하여 선정(禪定)loc="禪定(선정)". 2013년 3월 2일에 확인|ps=]]() 등지(等持) 정정(正定) 정의(定意) 조직정(調直定) 정심행처(正心行處)라 하기도 한다.pp=69-81세친 지음, 현장 한역, 권오민 번역|p=163 / 1397loc="三摩地". 2012년 9월 22일에 확인loc="三摩地(삼마지)". 2012년 9월 22일에 확인 (참고: 삼매())'
+]
 
 """### 2.wiki 텍스트 단위 구성
 - 어떤 단위로 wiki 텍스트 구성된걸까? -> 제목을 기준으로 나뉜 듯 함
@@ -129,10 +142,10 @@ wiki_df[wiki_df.text == '삼마지(,\n,\n,\n,\n,\n,\n,\n,\n)는\n설일체유부
 # A. 중제목/소제목 등 제목을 기준으로 나눈 것으로 보임. 위키피디아 페이지에서 해당 문서 제목 검색해서 직접 대조해봄
 
 # 예시 1: '양태 (문법)' 문서 (https://ko.wikipedia.org/wiki/%EC%96%91%ED%83%9C_(%EB%AC%B8%EB%B2%95)#cite_note-FOOTNOTEBybee1994176-179-35)
-wiki_df[wiki_df['title']=='양태 (문법)']
+wiki_df[wiki_df["title"] == "양태 (문법)"]
 
 # 예시 2: '당나라의 이슬람교' 문서 (https://ko.wikipedia.org/wiki/%EB%8B%B9%EB%82%98%EB%9D%BC%EC%9D%98_%EC%9D%B4%EC%8A%AC%EB%9E%8C%EA%B5%90)
-wiki_df[wiki_df['title']=='당나라의 이슬람교']
+wiki_df[wiki_df["title"] == "당나라의 이슬람교"]
 
 """### 3.train/validation의 context와 wikipedia text의 관계
 - train/valiation 데이터셋은 모두 wikipedia에서 나온 passage들인가? -> 맞음
@@ -143,14 +156,20 @@ wiki_df[wiki_df['title']=='당나라의 이슬람교']
 # A. 맞음
 
 # wiki_texts를 hash set으로 변환
-wiki_text_hashes = set(hash(text) for text in wiki_df['text'])
+wiki_text_hashes = set(hash(text) for text in wiki_df["text"])
 
 # 각 context의 hash를 구하고, wiki_text_hashes에 있는지 확인
-train_df['is_wikipedia'] = train_df['context'].apply(lambda context: hash(context) in wiki_text_hashes)
-train_df[~train_df['is_wikipedia']] # Wikipedia에 없는 passage만 필터링 (is_wikipedia가 False인 행들)
+train_df["is_wikipedia"] = train_df["context"].apply(
+    lambda context: hash(context) in wiki_text_hashes
+)
+train_df[
+    ~train_df["is_wikipedia"]
+]  # Wikipedia에 없는 passage만 필터링 (is_wikipedia가 False인 행들)
 
-valid_df['is_wikipedia'] = valid_df['context'].apply(lambda context: hash(context) in wiki_text_hashes)
-valid_df[~valid_df['is_wikipedia']]
+valid_df["is_wikipedia"] = valid_df["context"].apply(
+    lambda context: hash(context) in wiki_text_hashes
+)
+valid_df[~valid_df["is_wikipedia"]]
 
 """### 4.wikipedia 문서 기준 전처리 할 내용 탐색
 - 랜덤하게 문서들 샘플링해서, 눈으로 훑으며 전처리할 내용 탐색함 (정량적 수치 근거는 없음)
@@ -187,7 +206,6 @@ pprint(wiki_df[wiki_df.document_id == 4585].text.iloc[0])
 pprint(wiki_df[wiki_df.document_id == 39].text.iloc[0])
 
 
-
 """# train 데이터셋의 context 데이터 탐색
 - `train` 데이터셋의 context 대한 탐색 내용입니다
 - 살펴본 내용은 다음과 같습니다.
@@ -204,7 +222,7 @@ pprint(wiki_df[wiki_df.document_id == 39].text.iloc[0])
 """
 
 # 데이터셋 부르기 위한 datasets 라이브러리 다운로드
-#pip install datasets
+# pip install datasets
 
 # 탐색에 필요한 라이브러리 import
 from datasets import load_from_disk
@@ -215,27 +233,31 @@ import random
 from collections import Counter
 import re
 
+
 # pandas datasframe으로 변환 및 필요한 컬럼만 추출하는 함수
 def dataset_to_df(dataset):
-  data_list = []
+    data_list = []
 
-  for data in dataset:
-    data_list.append({
-        'title' : data["title"],
-        "context" : data["context"],
-        "question" : data["question"],
-        "answer_start" : data["answers"]["answer_start"][0],
-        "answer_text" : data["answers"]["text"][0],
-        "document_id" : data["document_id"]
-    })
-  df = pd.DataFrame(data_list)
-  return df
+    for data in dataset:
+        data_list.append(
+            {
+                "title": data["title"],
+                "context": data["context"],
+                "question": data["question"],
+                "answer_start": data["answers"]["answer_start"][0],
+                "answer_text": data["answers"]["text"][0],
+                "document_id": data["document_id"],
+            }
+        )
+    df = pd.DataFrame(data_list)
+    return df
+
 
 # 데이터셋 불러오기
 path = "your path"
 dataset = load_from_disk(path)
 print(dataset)
-print(dataset['train'])
+print(dataset["train"])
 
 train_df = dataset_to_df(dataset["train"])
 train_df.head()
@@ -255,8 +277,8 @@ print(sample_context)
 
 # 랜덤 샘플된 데이터 직접 확인하기
 for context in sample_context:
-  print(context)
-  print("=" * 50)
+    print(context)
+    print("=" * 50)
 
 """- 확인된 전처리 필요한 문자 <br>
   - `\\n`, `\n`, `\n*`, `\\n\\n`, `\n\n`
@@ -279,26 +301,27 @@ for context in sample_context:
 ### 2.데이터 중복 확인 및 데이터 탐색
 """
 
+
 # 특정 칼럼을 기준으로 중복된 값을 Counter 함수로 찾은 뒤 리턴하는 함수
 def count_duplication(column):
-  count = dict(Counter(train_df[column]))
-  count = sorted(count.items(),
-                 reverse=True,
-                 key=lambda item:item[1])
+    count = dict(Counter(train_df[column]))
+    count = sorted(count.items(), reverse=True, key=lambda item: item[1])
 
-  return count
+    return count
+
 
 def print_duplication(column):
-  total = len(train_df)
-  unique_column = len(train_df[column].unique())
+    total = len(train_df)
+    unique_column = len(train_df[column].unique())
 
-  print(f"전체 데이터 개수 : {total}")
-  print(f"unique한 {column} 개수 : {unique_column}")
+    print(f"전체 데이터 개수 : {total}")
+    print(f"unique한 {column} 개수 : {unique_column}")
 
-  if total != unique_column:
-    print(f"중복된 값이 있습니다. 중복된 값 개수 : {total - unique_column}")
-  else:
-    print("중복된 값이 없습니다.")
+    if total != unique_column:
+        print(f"중복된 값이 있습니다. 중복된 값 개수 : {total - unique_column}")
+    else:
+        print("중복된 값이 없습니다.")
+
 
 """#### document_id 기준으로 중복 확인
 
@@ -325,7 +348,10 @@ print(title_count)
 
 train_df[train_df["title"] == title_count[0][0]]
 
-train_df[(train_df["title"] == title_count[0][0]) & (train_df["answer_text"] == "다산 정약용")]
+train_df[
+    (train_df["title"] == title_count[0][0])
+    & (train_df["answer_text"] == "다산 정약용")
+]
 
 """#### document_id가 같으면서 answer_start가 같은지 확인"""
 
@@ -335,23 +361,31 @@ print(document_count)
 # document_id가 같으면서 answer_start가 같은 데이터 추출, document_id 값 추출
 document_list = []
 for count in document_count:
-  if count[1] > 1:
-    document_count_df = train_df[(train_df["document_id"] == count[0])]
-    same_answer_start_df = document_count_df[document_count_df.duplicated('answer_start', keep=False)]
-    if len(same_answer_start_df) > 0:
-      document_list.append(count[0])
+    if count[1] > 1:
+        document_count_df = train_df[(train_df["document_id"] == count[0])]
+        same_answer_start_df = document_count_df[
+            document_count_df.duplicated("answer_start", keep=False)
+        ]
+        if len(same_answer_start_df) > 0:
+            document_list.append(count[0])
 
 print(document_list)
 
 document_count_df = train_df[(train_df["document_id"] == 5322)]
-same_answer_start_df = document_count_df[document_count_df.duplicated('answer_start', keep=False)]
+same_answer_start_df = document_count_df[
+    document_count_df.duplicated("answer_start", keep=False)
+]
 same_answer_start_df
 
 document_answer_df = pd.DataFrame()
 for document in document_list:
-  document_count_df = train_df[(train_df["document_id"] == document)]
-  same_answer_start_df = document_count_df[document_count_df.duplicated('answer_start', keep=False)]
-  document_answer_df = pd.concat([document_answer_df, same_answer_start_df], ignore_index=True)
+    document_count_df = train_df[(train_df["document_id"] == document)]
+    same_answer_start_df = document_count_df[
+        document_count_df.duplicated("answer_start", keep=False)
+    ]
+    document_answer_df = pd.concat(
+        [document_answer_df, same_answer_start_df], ignore_index=True
+    )
 
 document_answer_df.head(10)
 
@@ -359,6 +393,7 @@ document_answer_df.head(10)
 
 language_train_df = train_df
 language_train_df.head()
+
 
 # 언어 분류 함수
 def classify_language(text):
@@ -371,19 +406,19 @@ def classify_language(text):
 
     for char in text:
         # 영어 (A-Z, a-z)
-        if 'A' <= char <= 'Z' or 'a' <= char <= 'z':
+        if "A" <= char <= "Z" or "a" <= char <= "z":
             has_english = True
         # 한글 (유니코드 범위: U+AC00 ~ U+D7A3)
-        elif '가' <= char <= '힣':
+        elif "가" <= char <= "힣":
             has_korean = True
         # 일본어 히라가나 (U+3040 ~ U+309F) 및 가타카나 (U+30A0 ~ U+30FF)
-        elif '\u3040' <= char <= '\u309F' or '\u30A0' <= char <= '\u30FF':
+        elif "\u3040" <= char <= "\u309F" or "\u30A0" <= char <= "\u30FF":
             has_japanese = True
         # 한자 (유니코드 범위: U+4E00 ~ U+9FFF)
-        elif '\u4E00' <= char <= '\u9FFF':
+        elif "\u4E00" <= char <= "\u9FFF":
             has_chinese = True
         # 아랍어 (유니코드 범위: U+0600 ~ U+06FF)
-        elif '\u0600' <= char <= '\u06FF':
+        elif "\u0600" <= char <= "\u06FF":
             has_arabic = True
         # 기타 문자
         else:
@@ -406,11 +441,12 @@ def classify_language(text):
 
     return ", ".join(languages) if languages else "Other"
 
+
 # 'context' 열에서 언어 분석 후 새로운 열 추가
-language_train_df['languages'] = language_train_df['context'].apply(classify_language)
+language_train_df["languages"] = language_train_df["context"].apply(classify_language)
 
 # 결과 출력
-print(language_train_df[['context', 'languages']])
+print(language_train_df[["context", "languages"]])
 
 language_train_df.head(10)
 
@@ -418,42 +454,48 @@ language_train_df.head(10)
 unique_languages = set()
 
 for language in list(language_train_df["languages"].unique()):
-    languages = language.split(', ')
+    languages = language.split(", ")
     unique_languages.update(languages)
 
 result = list(unique_languages)
 
 print(result)
 
-contains_df = language_train_df[language_train_df["context"].str.contains("폴 르 노르망")]
+contains_df = language_train_df[
+    language_train_df["context"].str.contains("폴 르 노르망")
+]
 print(contains_df.to_string())
 
 """### 4.데이터 전처리 필요 부분 확인 (문법, 어휘, 특수 문자 등)
 
 """
 
+
 # 개행 문자 카운트 함수 (by 정휘님)
 def get_newline(data_samples):
     all_lines = []
-    for i,data in enumerate(data_samples):
+    for i, data in enumerate(data_samples):
         new_line_count = data.count("\\n")
         all_lines.append([i, new_line_count])
     return all_lines
 
+
 newline_counts = np.array(get_newline(train_df["context"]))
-print(np.sum(newline_counts[:,1],axis=0))
+print(np.sum(newline_counts[:, 1], axis=0))
+
 
 # 특수 문자를 찾는 함수 정의
 def find_special_characters(text, pattern):
     # 정규 표현식을 사용하여 특수 문자 찾기
     return re.findall(pattern, text)
 
+
 # context에서 모든 특수 문자를 찾고 중복 제거
 all_special_chars = set()
-#pattern = r'[^a-zA-Z0-9가-힣\s]' # 알파벳, 숫자, 한글, 공백 제외
-#pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9fff]' # 알파벳, 숫자, 한글, 한자 공백 제외
-pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9FFF\u3040-\u309F\u30A0-\u30FF\u0600-\u06FF]' # 알파벳, 숫자, 한글, 한자, 일본어, 아랍어 공백 제외
-for context in train_df['context']:
+# pattern = r'[^a-zA-Z0-9가-힣\s]' # 알파벳, 숫자, 한글, 공백 제외
+# pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9fff]' # 알파벳, 숫자, 한글, 한자 공백 제외
+pattern = r"[^a-zA-Z0-9가-힣\s\u4e00-\u9FFF\u3040-\u309F\u30A0-\u30FF\u0600-\u06FF]"  # 알파벳, 숫자, 한글, 한자, 일본어, 아랍어 공백 제외
+for context in train_df["context"]:
     special_chars = find_special_characters(context, pattern)
     all_special_chars.update(special_chars)
 
@@ -492,17 +534,19 @@ answers = train_df["answer_text"]
 print(len(answers))
 answers.head()
 
+
 # 특수 문자를 찾는 함수 정의
 def find_special_characters(text, pattern):
     # 정규 표현식을 사용하여 특수 문자 찾기
     return re.findall(pattern, text)
 
+
 # context에서 모든 특수 문자를 찾고 중복 제거
 all_special_chars = set()
-pattern = r'[^a-zA-Z0-9가-힣\s]' # 알파벳, 숫자, 한글, 공백 제외
-#pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9fff]' # 알파벳, 숫자, 한글, 한자 공백 제외
-#pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9FFF\u3040-\u309F\u30A0-\u30FF\u0600-\u06FF]' # 알파벳, 숫자, 한글, 한자, 일본어, 아랍어 공백 제외
-for idx, context in enumerate(train_df['answer_text']):
+pattern = r"[^a-zA-Z0-9가-힣\s]"  # 알파벳, 숫자, 한글, 공백 제외
+# pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9fff]' # 알파벳, 숫자, 한글, 한자 공백 제외
+# pattern = r'[^a-zA-Z0-9가-힣\s\u4e00-\u9FFF\u3040-\u309F\u30A0-\u30FF\u0600-\u06FF]' # 알파벳, 숫자, 한글, 한자, 일본어, 아랍어 공백 제외
+for idx, context in enumerate(train_df["answer_text"]):
     special_chars = find_special_characters(context, pattern)
     all_special_chars.update(special_chars)
 
@@ -523,13 +567,13 @@ train_df[train_df["context"].str.contains("الكاشغري")]
 - 년도나 해를 묻는 답변에서는 년으로 끝나는게 맞아 보이지만 몇개는 `년`을 붙이지 않은 것이 몇개 인지 확인
 """
 
-years_df = train_df[train_df["question"].str.contains(r'년도|연도|해$', regex=True)]
+years_df = train_df[train_df["question"].str.contains(r"년도|연도|해$", regex=True)]
 print(len(years_df))
 years_df.head()
 
 # 년도 or 연도에 끝에 오는 질문의 답변 둘러보기
 for years in years_df["answer_text"]:
-  print(years)
+    print(years)
 
 len(years_df[years_df["answer_text"].str.contains("년")])
 
@@ -552,29 +596,32 @@ from transformers import AutoTokenizer
 from datasets import DatasetDict, load_from_disk, load_metric
 from arguments import DataTrainingArguments, ModelArguments
 import numpy as np
+
 datasets = load_from_disk("../data/train_dataset")
 print(datasets)
 
-tokenizer = AutoTokenizer.from_pretrained("uomnf97/klue-roberta-finetuned-korquad-v2", use_fast=True)
+tokenizer = AutoTokenizer.from_pretrained(
+    "uomnf97/klue-roberta-finetuned-korquad-v2", use_fast=True
+)
 
 """### 1.텍스트 토큰화"""
 
 question = datasets["train"]["question"]
 context = datasets["train"]["context"]
 
-max_seq_length = 2500 # 겹치는 부분이 없도록, 데이터 확인을 위해서 크게 잡음
+max_seq_length = 2500  # 겹치는 부분이 없도록, 데이터 확인을 위해서 크게 잡음
 doc_stride = 128
 tokenized_examples = tokenizer(
-            question,
-            context,
-            truncation="only_second",
-            max_length=max_seq_length,
-            stride=doc_stride,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            padding="max_length"
-        )
+    question,
+    context,
+    truncation="only_second",
+    max_length=max_seq_length,
+    stride=doc_stride,
+    return_overflowing_tokens=True,
+    return_offsets_mapping=True,
+    return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+    padding="max_length",
+)
 
 cls_token_id = tokenizer.cls_token_id
 sep_token_id = tokenizer.sep_token_id
@@ -605,6 +652,7 @@ Special Tokens
 * [MASK] token ID: 4
 """
 
+
 def convert_input_ids_to_tokens(tokenizer, tokenized_examples):
     tokenized_data = []
     for input_id_list in tokenized_examples["input_ids"]:
@@ -614,49 +662,58 @@ def convert_input_ids_to_tokens(tokenizer, tokenized_examples):
 
     return tokenized_data
 
-tokenized_data = np.array(convert_input_ids_to_tokens(tokenizer, tokenized_examples=tokenized_examples))
+
+tokenized_data = np.array(
+    convert_input_ids_to_tokens(tokenizer, tokenized_examples=tokenized_examples)
+)
 
 print(tokenized_examples["input_ids"][1])
 
 """#### UNK 토큰 개수 확인 (Question, Context) - Train dataset"""
 
+
 def check_unknown(tokenized_samples):
     # tokenized_samples = ["input_ids"] 리스트들
     unk_count_per_index = []
-    for i,sample in enumerate(tokenized_samples):
+    for i, sample in enumerate(tokenized_samples):
         sample_unk_count = 0
         for token in sample:
-            if token == 3: # unk token ids
+            if token == 3:  # unk token ids
                 sample_unk_count += 1
 
         unk_count_per_index.append([i, sample_unk_count])
 
     return np.array(unk_count_per_index)
 
-unk_token = check_unknown(tokenized_examples["input_ids"]) # [질문,지문]별 UNK 개수
+
+unk_token = check_unknown(tokenized_examples["input_ids"])  # [질문,지문]별 UNK 개수
 
 # 전체 context에 대한 UNK Token
-print(np.sum(unk_token[:,1],axis=0))
+print(np.sum(unk_token[:, 1], axis=0))
 
 """#### Unknown token외에 문제점이 보이는 token 확인"""
 
-special_tokens = ["[CLS]","[PAD]","[SEP]","[MASK]"]
+special_tokens = ["[CLS]", "[PAD]", "[SEP]", "[MASK]"]
+
+
 def get_encoded_data(data, index):
     tokens = []
-    for i,token in enumerate(data[index]):
+    for i, token in enumerate(data[index]):
         if token in special_tokens:
             continue
         tokens.append(token)
     return tokens
 
-special_tokens = ["[CLS]","[PAD]","[SEP]","[MASK]"]
+
+special_tokens = ["[CLS]", "[PAD]", "[SEP]", "[MASK]"]
 print(datasets["train"]["question"][0], datasets["train"]["context"][0])
 print(",".join(get_encoded_data(tokenized_data, 0)))
-print("number of UNK token :", unk_token[0]) # 총 4개
+print("number of UNK token :", unk_token[0])  # 총 4개
 
 """### 2.일본어, 한자 확인"""
 
 from pprint import pprint
+
 # 예시 데이터
 pprint(datasets["train"]["question"][4].split("."))
 pprint(datasets["train"]["context"][4].split("."))
@@ -673,6 +730,7 @@ datasets["train"]["answers"][136]
 """### 3.특수문자 확인"""
 
 from pprint import pprint
+
 # 예시 데이터
 pprint(datasets["train"]["question"][136].split("."))
 pprint(datasets["train"]["context"][136].split("."))
@@ -689,6 +747,7 @@ pprint(",".join(get_encoded_data(tokenized_data, 136)))
 """
 
 from pprint import pprint
+
 # 예시 데이터
 pprint(datasets["train"]["question"][183].split("."))
 pprint(datasets["train"]["context"][183].split("."))
@@ -702,12 +761,14 @@ pprint(", ".join(get_encoded_data(tokenized_data, 183)))
 위 예시를 보았을 때 "\"에 해당하는 부분이 [UNK]로 인식하여, "\\\n"을 개행토큰으로 보지 못한다.
 """
 
+
 def get_newline(data_samples):
     all_lines = []
-    for i,data in enumerate(data_samples):
+    for i, data in enumerate(data_samples):
         new_line_count = data.count("\\n")
         all_lines.append([i, new_line_count])
     return all_lines
+
 
 newline_counts = np.array(get_newline(datasets["train"]["context"]))
 
@@ -733,28 +794,32 @@ import re
 
 """  ### 1.데이터 로드"""
 
-def load_project_dataset(filepath): #
-  with open(filepath, 'r') as f:
-    data = json.load(f)
 
-  print(data.keys())
+def load_project_dataset(filepath):  #
+    with open(filepath, "r") as f:
+        data = json.load(f)
 
-  return data
+    print(data.keys())
 
-def load_korquad_dataset(filepath): #
-  with open(filepath, 'r') as f:
-    data = json.load(f)
+    return data
 
-  print(data.keys())
 
-  if "data" in data:
-    train_data = [item for topic in data['data'] for item in topic['paragraphs'] ]
+def load_korquad_dataset(filepath):  #
+    with open(filepath, "r") as f:
+        data = json.load(f)
 
-    print(train_data)
+    print(data.keys())
 
-  return data
+    if "data" in data:
+        train_data = [item for topic in data["data"] for item in topic["paragraphs"]]
+
+        print(train_data)
+
+    return data
+
 
 """### 2.텍스트 정규화 및 분석"""
+
 
 def normalize_text(text):
     # 소문자 변환
@@ -765,245 +830,296 @@ def normalize_text(text):
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
+
 def special_only_text(text):
-  # 소문자 변환
-  text = text.lower()
-  # 알파벳 한글 숫자 제거
-  text = re.sub(r"[a-zA-Z0-9가-힣]", "", text)
-  # 공백 정리
-  text = re.sub(r"\s+", " ", text).strip()
-  return text
+    # 소문자 변환
+    text = text.lower()
+    # 알파벳 한글 숫자 제거
+    text = re.sub(r"[a-zA-Z0-9가-힣]", "", text)
+    # 공백 정리
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 def normalize_context(data):
-  context_special_only = []
-  for context in data['context']:
-    context = normalize_text(context).split()
-    context_special_only += context
+    context_special_only = []
+    for context in data["context"]:
+        context = normalize_text(context).split()
+        context_special_only += context
 
-  print("normalized context:",Counter(context_special_only).most_common(10000))
+    print("normalized context:", Counter(context_special_only).most_common(10000))
+
 
 def special_only_context(data):
-  context_special_only = []
-  for context in data['context']:
-    context = special_only_text(context).split()
-    context_special_only += context
+    context_special_only = []
+    for context in data["context"]:
+        context = special_only_text(context).split()
+        context_special_only += context
 
-  print("context 내 특수문자 빈도:",Counter(context_special_only).most_common(10000))
+    print("context 내 특수문자 빈도:", Counter(context_special_only).most_common(10000))
+
 
 def normalize_answer(data):
-  answer_normal = []
-  for answer in data['answers']:
-    answer = normalize_text(answer['text'][0]).split()
-    answer_normal += answer
+    answer_normal = []
+    for answer in data["answers"]:
+        answer = normalize_text(answer["text"][0]).split()
+        answer_normal += answer
 
-  print("normalized answer:", Counter(answer_normal).most_common(10000))
+    print("normalized answer:", Counter(answer_normal).most_common(10000))
+
 
 def special_only_answer(data):
-  answer_special_only = []
-  for answer in data['answers']:
-    answer = special_only_text(answer['text'][0]).split()
-    answer_special_only += answer
+    answer_special_only = []
+    for answer in data["answers"]:
+        answer = special_only_text(answer["text"][0]).split()
+        answer_special_only += answer
 
-  print("answer 내 특수문자 빈도:", Counter(answer_special_only).most_common(10000))
+    print("answer 내 특수문자 빈도:", Counter(answer_special_only).most_common(10000))
+
 
 """### 3.성능 평가 메트릭"""
 
+
 def compute_f1(pred, ground):
-  pred_tokens = pred.split()
-  ground_tokens = ground.split()
-  common1 = Counter(pred_tokens) & Counter(ground_tokens)
-  common2 = set(pred_tokens) & set(ground_tokens)
-  num_common = sum(common1.values())
+    pred_tokens = pred.split()
+    ground_tokens = ground.split()
+    common1 = Counter(pred_tokens) & Counter(ground_tokens)
+    common2 = set(pred_tokens) & set(ground_tokens)
+    num_common = sum(common1.values())
 
-  if num_common == 0: return 0.0
+    if num_common == 0:
+        return 0.0
 
-  precision = num_common / len(pred_tokens)
-  recall = num_common / len(ground_tokens)
+    precision = num_common / len(pred_tokens)
+    recall = num_common / len(ground_tokens)
 
-  f1 = 2 * precision * recall / (precision + recall)
-  return f1
+    f1 = 2 * precision * recall / (precision + recall)
+    return f1
+
 
 def compute_em(pred, ground):
-  return int(pred == ground)
+    return int(pred == ground)
+
 
 def evaluate_mrc(data):
-  em_scores = []
-  f1_scores = []
+    em_scores = []
+    f1_scores = []
 
-  for answer, context in zip(data['answers'], data['context']):
-    pred = context[answer['answer_start'][0]:answer['answer_start'][0] + len(answer['text'][0])]
-    ground = answer['text'][0]
+    for answer, context in zip(data["answers"], data["context"]):
+        pred = context[
+            answer["answer_start"][0] : answer["answer_start"][0]
+            + len(answer["text"][0])
+        ]
+        ground = answer["text"][0]
 
-    em_scores += [compute_em(pred, ground)]
-    f1_scores += [compute_f1(pred, ground)]
+        em_scores += [compute_em(pred, ground)]
+        f1_scores += [compute_f1(pred, ground)]
 
-  print(f"average em score: {sum(em_scores) / len(em_scores) * 100:.2f}")
-  print(f"average f1 score: {sum(f1_scores) / len(f1_scores) * 100:.2f}")
+    print(f"average em score: {sum(em_scores) / len(em_scores) * 100:.2f}")
+    print(f"average f1 score: {sum(f1_scores) / len(f1_scores) * 100:.2f}")
+
 
 """### 4.데이터 분석 및 출력"""
 
+
 def print_data(data):
-  print(f"dataset keys: {data.keys()}")
-  #print(f"dataset version: {data.version}")
-  print(f"dataset size: {len(data['title'])}")
+    print(f"dataset keys: {data.keys()}")
+    # print(f"dataset version: {data.version}")
+    print(f"dataset size: {len(data['title'])}")
 
-  context_count = len(data['context'])#[len(article['paragraphs']) for article in data]
-  #print(f"paragraphs per doc: {len(context_count)}")
-  print(f"number of article: {context_count}")
+    context_count = len(
+        data["context"]
+    )  # [len(article['paragraphs']) for article in data]
+    # print(f"paragraphs per doc: {len(context_count)}")
+    print(f"number of article: {context_count}")
 
-  question_count = len(data['question'])#[len(article['paragraphs']) for article in data]
-  #print(f"paragraphs per doc: {len(context_count)}")
-  print(f"number of question: {question_count}")
+    question_count = len(
+        data["question"]
+    )  # [len(article['paragraphs']) for article in data]
+    # print(f"paragraphs per doc: {len(context_count)}")
+    print(f"number of question: {question_count}")
+
 
 def print_text_info(data, column_name):
-  num_of_words = []
-  seq_length = []
+    num_of_words = []
+    seq_length = []
 
-  if type(data[column_name][0]) is not str:
-    print("The field data is not String")
-    return
+    if type(data[column_name][0]) is not str:
+        print("The field data is not String")
+        return
 
-  for seq in data[column_name]:
-    num_of_words += [len(seq.split())]
-    seq_length += [len(seq)]
+    for seq in data[column_name]:
+        num_of_words += [len(seq.split())]
+        seq_length += [len(seq)]
 
-  print(f"average {column_name} num of words: {sum(num_of_words) / len(num_of_words):.2f}")
+    print(
+        f"average {column_name} num of words: {sum(num_of_words) / len(num_of_words):.2f}"
+    )
 
-  print(f"max {column_name} num of words: {max(num_of_words):.2f}")
+    print(f"max {column_name} num of words: {max(num_of_words):.2f}")
 
-  print(f"average {column_name} length: {sum(seq_length) / len(seq_length):.2f}")
+    print(f"average {column_name} length: {sum(seq_length) / len(seq_length):.2f}")
 
-  print(f"max {column_name} length: {max(seq_length):.2f}")
+    print(f"max {column_name} length: {max(seq_length):.2f}")
 
-  words = [word for seq in data[column_name] for word in seq.split()]
-  print(f"{column_name} most common word: {Counter(words).most_common(30)}")
+    words = [word for seq in data[column_name] for word in seq.split()]
+    print(f"{column_name} most common word: {Counter(words).most_common(30)}")
 
-  first_word = [seq.split()[0] for seq in data[column_name]]
-  print(f"{column_name} most common first word: {Counter(first_word).most_common(30)}")
+    first_word = [seq.split()[0] for seq in data[column_name]]
+    print(
+        f"{column_name} most common first word: {Counter(first_word).most_common(30)}"
+    )
 
-  last_word = [seq.split()[-1] for seq in data[column_name]]
-  print(f"{column_name} most common last word: {Counter(last_word).most_common(30)}")
+    last_word = [seq.split()[-1] for seq in data[column_name]]
+    print(f"{column_name} most common last word: {Counter(last_word).most_common(30)}")
+
 
 def print_questions(data):
-  print_text_info(data, 'question')
+    print_text_info(data, "question")
+
 
 def print_contexts(data):
-  print_text_info(data, 'context')
+    print_text_info(data, "context")
+
 
 def print_answers(data):
-  answer_num_of_words = []
-  answer_word_position =[]
+    answer_num_of_words = []
+    answer_word_position = []
 
-  answer_length = []
-  answer_char_position =[]
+    answer_length = []
+    answer_char_position = []
 
-  column_name = 'answers'
+    column_name = "answers"
 
-  for answer, context in zip(data['answers'], data['context']):
-    answer_text = answer['text'] # " ["tessdfjksfj"]"
-    answer_start = answer['answer_start']# "[1233]"
-    if len(answer_text) > 1:print("multiple answer")
-    if len(answer_start) > 1:print("multiple answer start")
-    if answer_text[0] == "":print("@@@@@ no answer")
-    if answer_text[0].lower() in ["null", "no", "", "none", None]:print("@@@@@@ no  answer")
-    #if context[answer_start[0]] == answer_text[0]:print("yes");print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
-    #else:print('no');print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
+    for answer, context in zip(data["answers"], data["context"]):
+        answer_text = answer["text"]  # " ["tessdfjksfj"]"
+        answer_start = answer["answer_start"]  # "[1233]"
+        if len(answer_text) > 1:
+            print("multiple answer")
+        if len(answer_start) > 1:
+            print("multiple answer start")
+        if answer_text[0] == "":
+            print("@@@@@ no answer")
+        if answer_text[0].lower() in ["null", "no", "", "none", None]:
+            print("@@@@@@ no  answer")
+        # if context[answer_start[0]] == answer_text[0]:print("yes");print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
+        # else:print('no');print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
 
-    answer = answer_text[0]
-    answer_pos = answer_start[0]
+        answer = answer_text[0]
+        answer_pos = answer_start[0]
 
-    answer_num_of_words += [len(answer.split())]
-    answer_length += [len(answer)]
+        answer_num_of_words += [len(answer.split())]
+        answer_length += [len(answer)]
 
-    answer_word_position += [len(context[:answer_pos+1].split())]
-    answer_char_position += [answer_pos]
+        answer_word_position += [len(context[: answer_pos + 1].split())]
+        answer_char_position += [answer_pos]
 
-  print(f"average {column_name} num of words: {sum(answer_num_of_words) / len(answer_num_of_words):.2f}")
+    print(
+        f"average {column_name} num of words: {sum(answer_num_of_words) / len(answer_num_of_words):.2f}"
+    )
 
-  print(f"max {column_name} num of words: {max(answer_num_of_words):.2f}")
+    print(f"max {column_name} num of words: {max(answer_num_of_words):.2f}")
 
-  print(f"average {column_name} length: {sum(answer_length) / len(answer_length):.2f}")
+    print(
+        f"average {column_name} length: {sum(answer_length) / len(answer_length):.2f}"
+    )
 
-  print(f"max {column_name} length: {max(answer_length):.2f}")
+    print(f"max {column_name} length: {max(answer_length):.2f}")
 
-  print(f"average {column_name} word start position: {sum(answer_word_position) / len(answer_word_position):.2f}")
+    print(
+        f"average {column_name} word start position: {sum(answer_word_position) / len(answer_word_position):.2f}"
+    )
 
-  print(f"max {column_name} word start position: {max(answer_word_position):.2f}")
+    print(f"max {column_name} word start position: {max(answer_word_position):.2f}")
 
-  print(f"average {column_name} char start position: {sum(answer_char_position) / len(answer_char_position):.2f}")
+    print(
+        f"average {column_name} char start position: {sum(answer_char_position) / len(answer_char_position):.2f}"
+    )
 
-  print(f"max {column_name} char start position: {max(answer_char_position):.2f}")
+    print(f"max {column_name} char start position: {max(answer_char_position):.2f}")
 
-  answer_word = [word for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common word: {Counter(answer_word).most_common(30)}")
+    answer_word = [
+        word for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(f"answer most common word: {Counter(answer_word).most_common(30)}")
 
-  answer_first_word = [word[0] for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common first word: {Counter(answer_first_word).most_common(30)}")
+    answer_first_word = [
+        word[0] for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(
+        f"answer most common first word: {Counter(answer_first_word).most_common(30)}"
+    )
 
-  answer_last_word = [word[-1] for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common last word: {Counter(answer_last_word).most_common(30)}")
+    answer_last_word = [
+        word[-1] for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(f"answer most common last word: {Counter(answer_last_word).most_common(30)}")
+
 
 """### 5.메인 실행"""
 
 if __name__ == "__main__":
-  filepath = "train_examples.json"
-  data = load_project_dataset(filepath)
+    filepath = "train_examples.json"
+    data = load_project_dataset(filepath)
 
-  print("data analysis")
-  print_data(data)
+    print("data analysis")
+    print_data(data)
 
-  print("question analysis")
-  print_questions(data)
+    print("question analysis")
+    print_questions(data)
 
-  print("context analysis")
-  print_contexts(data)
-  normalize_context(data)
-  special_only_context(data)
+    print("context analysis")
+    print_contexts(data)
+    normalize_context(data)
+    special_only_context(data)
 
-  print("answer analysis")
-  print_answers(data)
-  normalize_answer(data)
-  special_only_answer(data)
+    print("answer analysis")
+    print_answers(data)
+    normalize_answer(data)
+    special_only_answer(data)
 
-  print("metric analysis")
-  evaluate_mrc(data)
+    print("metric analysis")
+    evaluate_mrc(data)
 
 if __name__ == "__main__":
-  filepath = "dev_examples.json"
-  data = load_project_dataset(filepath)
+    filepath = "dev_examples.json"
+    data = load_project_dataset(filepath)
 
-  print("data analysis")
-  print_data(data)
+    print("data analysis")
+    print_data(data)
 
-  print("question analysis")
-  print_questions(data)
+    print("question analysis")
+    print_questions(data)
 
-  print("context analysis")
-  print_contexts(data)
-  normalize_context(data)
-  special_only_context(data)
+    print("context analysis")
+    print_contexts(data)
+    normalize_context(data)
+    special_only_context(data)
 
-  print("answer analysis")
-  print_answers(data)
-  normalize_answer(data)
-  special_only_answer(data)
+    print("answer analysis")
+    print_answers(data)
+    normalize_answer(data)
+    special_only_answer(data)
 
-  print("metric analysis")
-  evaluate_mrc(data)
+    print("metric analysis")
+    evaluate_mrc(data)
 
 """### 6.통합"""
 
 import json
 import re
-#import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 from collections import Counter
 from transformers import BertTokenizer
 
+
 # 1. 데이터 로드
 def load_korquad_data(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
+
 
 # 2. 데이터 전처리 - 텍스트 정규화
 def normalize_text(text):
@@ -1011,73 +1127,97 @@ def normalize_text(text):
     text = re.sub(r"\s+", " ", text).strip()  # 불필요한 공백 제거
     return text
 
+
 def print_data(data):
-  print(f"dataset keys: {data.keys()}")
-  #print(f"dataset version: {data.version}")
-  print(f"dataset size: {len(data['title'])}")
+    print(f"dataset keys: {data.keys()}")
+    # print(f"dataset version: {data.version}")
+    print(f"dataset size: {len(data['title'])}")
 
-  context_count = len(data['context'])#[len(article['paragraphs']) for article in data]
-  #print(f"paragraphs per doc: {len(context_count)}")
-  print(f"number of article: {context_count}")
+    context_count = len(
+        data["context"]
+    )  # [len(article['paragraphs']) for article in data]
+    # print(f"paragraphs per doc: {len(context_count)}")
+    print(f"number of article: {context_count}")
 
-  question_count = len(data['question'])#[len(article['paragraphs']) for article in data]
-  #print(f"paragraphs per doc: {len(context_count)}")
-  print(f"number of question: {question_count}")
+    question_count = len(
+        data["question"]
+    )  # [len(article['paragraphs']) for article in data]
+    # print(f"paragraphs per doc: {len(context_count)}")
+    print(f"number of question: {question_count}")
+
 
 def print_questions(data):
-  context_length = []
-  question_length = []
+    context_length = []
+    question_length = []
 
-  for context in data['context']:
-    context_length += [len(context.split())]
+    for context in data["context"]:
+        context_length += [len(context.split())]
 
-  for question in data['question']:
-    question_length += [len(question.split())]
+    for question in data["question"]:
+        question_length += [len(question.split())]
 
-  print(f"average paragraph length: {sum(context_length) / len(context_length):.2f}")
+    print(f"average paragraph length: {sum(context_length) / len(context_length):.2f}")
 
-  print(f"max paragraph length: {max(context_length):.2f}")
+    print(f"max paragraph length: {max(context_length):.2f}")
 
-  print(f"average question length: {sum(question_length) / len(question_length):.2f}")
+    print(f"average question length: {sum(question_length) / len(question_length):.2f}")
 
-  print(f"max question length: {max(question_length):.2f}")
+    print(f"max question length: {max(question_length):.2f}")
 
-  question_word = [word for question in data['question'] for word in question.split()]
-  print(f"question most common word: {Counter(question_word).most_common(30)}")
+    question_word = [word for question in data["question"] for word in question.split()]
+    print(f"question most common word: {Counter(question_word).most_common(30)}")
 
-  question_first_word = [question.split()[0] for question in data['question']]
-  print(f"question most common first word: {Counter(question_first_word).most_common(30)}")
+    question_first_word = [question.split()[0] for question in data["question"]]
+    print(
+        f"question most common first word: {Counter(question_first_word).most_common(30)}"
+    )
 
-  question_last_word = [question.split()[-1] for question in data['question']]
-  print(f"question most common last word: {Counter(question_last_word).most_common(30)}")
+    question_last_word = [question.split()[-1] for question in data["question"]]
+    print(
+        f"question most common last word: {Counter(question_last_word).most_common(30)}"
+    )
+
 
 def print_answers(data):
-  answer_length = []
-  answer_position =[]
+    answer_length = []
+    answer_position = []
 
-  for answer, context in zip(data['answers'], data['context']):
-    answer_text = answer['text']
-    answer_start = answer['answer_start']
-    if len(answer_text) > 1:print("multiple answer")
-    if len(answer_start) > 1:print("multiple answer start")
-    if answer_text[0] == "":print("@@@@@ no answer")
-    if answer_text[0].lower() in ["null", "no", "", "none", None]:print("@@@@@@ no  answer")
-    #if context[answer_start[0]] == answer_text[0]:print("yes");print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
-    #else:print('no');print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
-    answer_length += [len(answer_text[0].split())]
-    answer_position += [answer_start[0]]
+    for answer, context in zip(data["answers"], data["context"]):
+        answer_text = answer["text"]
+        answer_start = answer["answer_start"]
+        if len(answer_text) > 1:
+            print("multiple answer")
+        if len(answer_start) > 1:
+            print("multiple answer start")
+        if answer_text[0] == "":
+            print("@@@@@ no answer")
+        if answer_text[0].lower() in ["null", "no", "", "none", None]:
+            print("@@@@@@ no  answer")
+        # if context[answer_start[0]] == answer_text[0]:print("yes");print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
+        # else:print('no');print(context[answer_start[0]], answer_start[0], answer_text, answer_text[0])
+        answer_length += [len(answer_text[0].split())]
+        answer_position += [answer_start[0]]
 
-  print(f"average answer length: {sum(answer_length) / len(answer_length):.2f}")
-  print(f"average answer position: {sum(answer_position) / len(answer_position):.2f}")
+    print(f"average answer length: {sum(answer_length) / len(answer_length):.2f}")
+    print(f"average answer position: {sum(answer_position) / len(answer_position):.2f}")
 
-  answer_word = [word for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common word: {Counter(answer_word).most_common(30)}")
+    answer_word = [
+        word for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(f"answer most common word: {Counter(answer_word).most_common(30)}")
 
-  answer_first_word = [word[0] for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common first word: {Counter(answer_first_word).most_common(30)}")
+    answer_first_word = [
+        word[0] for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(
+        f"answer most common first word: {Counter(answer_first_word).most_common(30)}"
+    )
 
-  answer_last_word = [word[-1] for answer in data['answers'] for word in answer['text'][0].split()]
-  print(f"answer most common last word: {Counter(answer_last_word).most_common(30)}")
+    answer_last_word = [
+        word[-1] for answer in data["answers"] for word in answer["text"][0].split()
+    ]
+    print(f"answer most common last word: {Counter(answer_last_word).most_common(30)}")
+
 
 def normalize_special_text(text):
     # 소문자 변환
@@ -1088,52 +1228,58 @@ def normalize_special_text(text):
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
+
 def special_only_text(text):
-  # 소문자 변환
-  text = text.lower()
-  # 특수 문자 이외 제거
-  text = re.sub(r"[a-zA-Z0-9가-힣]", "", text)
-  # 공백 정리
-  text = re.sub(r"\s+", " ", text).strip()
-  return text
+    # 소문자 변환
+    text = text.lower()
+    # 특수 문자 이외 제거
+    text = re.sub(r"[a-zA-Z0-9가-힣]", "", text)
+    # 공백 정리
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 def special_only_context(data):
-  context_special_only = []
-  for context in data['context']:
-    context = special_only_text(context).split()
-    context_special_only += context
+    context_special_only = []
+    for context in data["context"]:
+        context = special_only_text(context).split()
+        context_special_only += context
 
-  print(Counter(context_special_only).most_common(10000))
+    print(Counter(context_special_only).most_common(10000))
+
 
 def normal_answer(data):
-  answer_normal = []
-  for answer in data['answers']:
-    answer = normalize_text(answer['text'][0]).split()
-    answer_normal += answer
+    answer_normal = []
+    for answer in data["answers"]:
+        answer = normalize_text(answer["text"][0]).split()
+        answer_normal += answer
 
-  print("normalized answer:", Counter(answer_normal).most_common(10000))
+    print("normalized answer:", Counter(answer_normal).most_common(10000))
+
 
 def special_only_answer(data):
-  answer_special_only = []
-  for answer in data['answers']:
-    answer = special_only_text(answer['text'][0]).split()
-    answer_special_only += answer
+    answer_special_only = []
+    for answer in data["answers"]:
+        answer = special_only_text(answer["text"][0]).split()
+        answer_special_only += answer
 
-  print("answer 내 특수문자 빈도:", Counter(answer_special_only).most_common(10000))
+    print("answer 내 특수문자 빈도:", Counter(answer_special_only).most_common(10000))
+
 
 # 3. 데이터 분석 준비
 def preprocess_korquad1(data):
     dataset = []
-    for article in data['data']:
-        for paragraph in article['paragraphs']:
-            context = normalize_text(paragraph['context'])
-            for qa in paragraph['qas']:
-                question = normalize_text(qa['question'])
-                if len(qa['answers']) > 0:
-                    answer_text = normalize_text(qa['answers'][0]['text'])
-                    answer_start = qa['answers'][0]['answer_start']
+    for article in data["data"]:
+        for paragraph in article["paragraphs"]:
+            context = normalize_text(paragraph["context"])
+            for qa in paragraph["qas"]:
+                question = normalize_text(qa["question"])
+                if len(qa["answers"]) > 0:
+                    answer_text = normalize_text(qa["answers"][0]["text"])
+                    answer_start = qa["answers"][0]["answer_start"]
                     dataset.append((context, question, answer_text, answer_start))
     return dataset
+
 
 # 3. 데이터 분석 준비
 def preprocess_korquad(data):
@@ -1142,24 +1288,30 @@ def preprocess_korquad(data):
     questions = []
     titles = []
 
-    for article in data['data']:
-        for paragraph in article['paragraphs']:
-            context = paragraph['context']
-            for qa in paragraph['qas']:
-                question = qa['question']
-                if len(qa['answers']) > 0:
-                    answer_text = qa['answers'][0]['text']
-                    answer_start = qa['answers'][0]['answer_start']
-                else:print("qas answers len < 0 what the?")
+    for article in data["data"]:
+        for paragraph in article["paragraphs"]:
+            context = paragraph["context"]
+            for qa in paragraph["qas"]:
+                question = qa["question"]
+                if len(qa["answers"]) > 0:
+                    answer_text = qa["answers"][0]["text"]
+                    answer_start = qa["answers"][0]["answer_start"]
+                else:
+                    print("qas answers len < 0 what the?")
 
                 contexts += [context]
-                answers += [{'text':[answer_text], 'answer_start':[answer_start]}]
+                answers += [{"text": [answer_text], "answer_start": [answer_start]}]
                 questions += [question]
-                titles += [article['title']]
+                titles += [article["title"]]
 
-
-    dataset = {'title':titles, 'context':contexts, 'question':questions, 'answers': answers}
+    dataset = {
+        "title": titles,
+        "context": contexts,
+        "question": questions,
+        "answers": answers,
+    }
     return dataset
+
 
 # 4. 기본 통계 분석
 def analyze_data(dataset):
@@ -1182,14 +1334,15 @@ def analyze_data(dataset):
 
     # 길이 분포를 그래프로 시각화
     plt.figure(figsize=(12, 6))
-    plt.hist(context_lengths, bins=50, alpha=0.7, label='Context Length')
-    plt.hist(question_lengths, bins=50, alpha=0.7, label='Question Length')
-    plt.hist(answer_lengths, bins=50, alpha=0.7, label='Answer Length')
+    plt.hist(context_lengths, bins=50, alpha=0.7, label="Context Length")
+    plt.hist(question_lengths, bins=50, alpha=0.7, label="Question Length")
+    plt.hist(answer_lengths, bins=50, alpha=0.7, label="Answer Length")
     plt.legend()
-    plt.title('Length Distribution of Context, Question, and Answer')
-    plt.xlabel('Length')
-    plt.ylabel('Frequency')
+    plt.title("Length Distribution of Context, Question, and Answer")
+    plt.xlabel("Length")
+    plt.ylabel("Frequency")
     plt.show()
+
 
 # 5. 토크나이저 적용 및 토큰화
 def tokenize_data(dataset):
@@ -1203,6 +1356,7 @@ def tokenize_data(dataset):
         tokenized_dataset.append((context_tokens, question_tokens, answer_tokens))
 
     return tokenized_dataset
+
 
 # 6. 빈도 분석
 def analyze_token_frequencies(tokenized_dataset):
@@ -1227,37 +1381,42 @@ def analyze_token_frequencies(tokenized_dataset):
     # 토큰 빈도 그래프 그리기
     plt.figure(figsize=(12, 6))
     context_top_tokens = context_counter.most_common(10)
-    plt.bar([token[0] for token in context_top_tokens], [token[1] for token in context_top_tokens], label="Context Tokens")
+    plt.bar(
+        [token[0] for token in context_top_tokens],
+        [token[1] for token in context_top_tokens],
+        label="Context Tokens",
+    )
     plt.title("Top 10 Tokens in Context")
     plt.show()
 
+
 # KorQuAD 데이터 파일 경로 설정
-file_path = 'KorQuAD_v1.0_train.json'  # 적절한 파일 경로로 변경 필요
+file_path = "KorQuAD_v1.0_train.json"  # 적절한 파일 경로로 변경 필요
 
 # 실행
 korquad_data = load_korquad_data(file_path)
 preprocessed_data = preprocess_korquad(korquad_data)
 data = preprocessed_data
 if preprocessed_data:
-  print("data analysis")
-  print_data(data)
+    print("data analysis")
+    print_data(data)
 
-  special_only_context(data)
+    special_only_context(data)
 
-  print("question analysis")
-  print_questions(data)
+    print("question analysis")
+    print_questions(data)
 
-  print("answer analysis")
-  print_answers(data)
+    print("answer analysis")
+    print_answers(data)
 
-  special_only_answer(data)
+    special_only_answer(data)
 
-  print("metric analysis")
-  evaluate_mrc(data)
-#analyze_data(preprocessed_data)
+    print("metric analysis")
+    evaluate_mrc(data)
+# analyze_data(preprocessed_data)
 
-#tokenized_data = tokenize_data(preprocessed_data)
-#analyze_token_frequencies(tokenized_data)
+# tokenized_data = tokenize_data(preprocessed_data)
+# analyze_token_frequencies(tokenized_data)
 
 """### 7.성능 평가"""
 
@@ -1268,25 +1427,25 @@ filepath = "dev_examples.json"
 data = load_project_dataset(filepath)
 
 preds = ""
-file_path = 'predictions_train.json'
-with open(file_path, 'r', encoding='utf-8') as f:
-  preds = json.load(f)
+file_path = "predictions_train.json"
+with open(file_path, "r", encoding="utf-8") as f:
+    preds = json.load(f)
 
 print(preds)
 print("compare")
-dt=[]
+dt = []
 for id, pred in preds.items():
-  i = data['id'].index(id)
-  ground = data['answers'][i]['text'][0]
-  f1 = compute_f1(pred, ground)
-  em = compute_em(pred, ground)
-  print(f"f1: {f1:.2f}, em: {em:.2f}")
-  if em < 1:
-    dt+=[[id,i,data['question'][i],pred,ground]]
+    i = data["id"].index(id)
+    ground = data["answers"][i]["text"][0]
+    f1 = compute_f1(pred, ground)
+    em = compute_em(pred, ground)
+    print(f"f1: {f1:.2f}, em: {em:.2f}")
+    if em < 1:
+        dt += [[id, i, data["question"][i], pred, ground]]
 
 print("----")
 for d in dt:
-  print(f"qusetion: {d[2]}, ground: {d[4]}, pred: {d[3]}")
+    print(f"qusetion: {d[2]}, ground: {d[4]}, pred: {d[3]}")
 
 """### 8.파인튜닝 결과
 
