@@ -34,8 +34,8 @@
 
 ## 4. 주요 접근 방법
 - **데이터**
-	- [데이터 분석](./EDA_team_folder/) 및 [전처리](./data_preprocessing/): 개행(`\n`), 마크다운 문법, 외국어 전처리 및 실험
-	- [데이터 증강](./data_augmentation/): AEDA, OpenAI GPT-4o 프롬프트 튜닝
+	- [데이터 분석](./Data/EDA/) 및 [전처리](./Data/preprocessing/): 개행(`\n`), 마크다운 문법, 외국어 전처리 및 실험
+	- [데이터 증강](./Data/augmentation/): AEDA, OpenAI GPT-4o 프롬프트 튜닝
 - **Retrieval model**
 	- [Sparse](./retrieval/sparse/): TF-IDF, BM25, BGE-M3, SPLADE
 	- [Dense](./retrieval/dense/): Bi-Encoder, Cross-Encoder, 2-stage retrieval
