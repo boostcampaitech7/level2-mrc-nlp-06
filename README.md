@@ -99,7 +99,7 @@ level2-mrc-nlp-06
 ├── Data
 │   ├── EDA		   # EDA 수행 노트북 파일
 │   ├── preprocessing      # 데이터 전처리
-│   ├── augmentation       # 데이터 증강
+│   └── augmentation       # 데이터 증강
 ├── retrieval              # Retrieve 모델 관련 코드
 │   ├── sparse
 │   ├── dense
