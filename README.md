@@ -96,8 +96,8 @@ bash inference.sh --qa ext --retrieval sparse --do_predict
 ## 7. 코드 구조
 ```text
 level2-mrc-nlp-06
-├── data
-│   ├── EDA		           # EDA 수행 노트북 파일
+├── Data
+│   ├── EDA		   # EDA 수행 노트북 파일
 │   ├── preprocessing      # 데이터 전처리
 │   └── augmentation       # 데이터 증강
 ├── retrieval              # Retrieve 모델 관련 코드
